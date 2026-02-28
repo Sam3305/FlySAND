@@ -1,0 +1,10 @@
+{
+    "source": "IOCL (Fallback Baseline)",
+    "effective_date": "March 2026 Baseline",
+    "prices_inr_per_kl": {
+        "DEL": 92323.02,
+        "CCU": 95378.02,
+        "BOM": 86352.19,
+        "MAA": 95770.0
+    }
+}
