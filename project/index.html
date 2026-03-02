@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AeroSync - Operations</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <div id="login-page" class="page active">
+        <div class="login-wrapper">
+            <div class="login-card">
+                <h1 style="color: #001b94; margin-bottom: 5px;">AeroSync</h1>
+                <p style="color: #666; margin-top: 0; margin-bottom: 25px;">Select your portal access</p>
+                
+                <div class="role-tabs">
+                    <button class="role-btn active" id="btn-user" onclick="selectRole('user')">User</button>
+                    <button class="role-btn" id="btn-analyst" onclick="selectRole('analyst')">Analyst</button>
+                    <button class="role-btn" id="btn-admin" onclick="selectRole('admin')">Admin</button>
+                </div>
+
+                <div class="form-group">
+                    <label>Username</label>
+                    <input type="text" id="username" value="passenger123">
+                </div>
+                <div class="form-group">
+                    <label>Password</label>
+                    <input type="password" id="password" value="pass123">
+                </div>
+
+                <button class="btn-primary" style="width: 100%; margin-top: 15px;" onclick="doLogin()">SECURE LOGIN</button>
+            </div>
+        </div>
+    </div>
+
+
+    <div id="dashboard-page" class="page">
+        <nav class="navbar">
+            <div class="logo">AeroSync Workspace</div>
+            <div class="nav-links">
+                <span id="welcome-text" style="color: #ffeb3b; font-weight: bold; margin-right: 20px;">Welcome</span>
+                <button class="btn-logout" onclick="doLogout()">Logout</button>
+            </div>
+        </nav>
+
+        <div class="container">
+            
+            <div id="dashboard-analyst" class="dashboard-content">
+                <h2>📈 Live Revenue & Fleet Analytics</h2>
+                
+                <div class="metrics-grid">
+                    <div class="metric-box">
+                        <h3>Total Daily Revenue</h3>
+                        <div class="value">₹12,45,900</div>
+                        <div class="trend positive">▲ +5.2% from yesterday</div>
+                    </div>
+                    <div class="metric-box">
+                        <h3>Active Flights</h3>
+                        <div class="value">142</div>
+                        <div class="trend">98% On Schedule</div>
+                    </div>
+                    <div class="metric-box alert-box">
+                        <h3>Dynamic Surcharges Active</h3>
+                        <div class="value">18 Flights</div>
+                        <div class="trend negative">Weather / Altitude limits triggered</div>
+                    </div>
+                    <div class="metric-box">
+                        <h3>Avg. Break-Even Fuel</h3>
+                        <div class="value">3,120 kg</div>
+                        <div class="trend positive">▼ -2% optimized</div>
+                    </div>
+                </div>
+
+                <div class="table-card">
+                    <h3>⚠️ Recent High-Burn Alerts (Live)</h3>
+                    <table class="data-table">
+                        <tr><th>Flight No.</th><th>Route</th><th>Issue Detected</th><th>AI Action Taken</th></tr>
+                        <tr><td><b>AS-4846</b></td><td>DEL → BOM</td><td>25,000ft / -5kts wind</td><td><span class="badge badge-red">+15% Fare Increase</span></td></tr>
+                        <tr><td><b>AS-5096</b></td><td>MAA → CCU</td><td>Holding Pattern (Traffic)</td><td><span class="badge badge-yellow">+8% Fare Increase</span></td></tr>
+                        <tr><td><b>AS-1120</b></td><td>BLR → DEL</td><td>Storm Diversion</td><td><span class="badge badge-red">+22% Fare Increase</span></td></tr>
+                    </table>
+                </div>
+            </div>
+
+            <div id="dashboard-booking" class="dashboard-content">
+                <h2>✈️ Flight Operations</h2>
+                
+                <div class="search-box card">
+                    <div class="input-group" style="position: relative;">
+                        <label>LEAVING FROM</label>
+                        <input type="text" id="origin" placeholder="e.g. DEL or Delhi" autocomplete="off">
+                        <div id="origin-suggestions" class="suggestions-box"></div>
+                    </div>
+                    <div class="input-group" style="position: relative;">
+                        <label>GOING TO</label>
+                        <input type="text" id="dest" placeholder="e.g. BOM or Mumbai" autocomplete="off">
+                        <div id="dest-suggestions" class="suggestions-box"></div>
+                    </div>
+                    <button class="btn-primary" onclick="searchFlights()">SEARCH ROUTES</button>
+                </div>
+
+                <div id="admin-sim-panel" class="card sim-card" style="display: none; margin-top: 20px;">
+                    <h3 style="color: #001b94; margin-top: 0;">🛠️ Admin Overrides (Physics Engine)</h3>
+                    <div style="display: flex; gap: 20px;">
+                        <div class="form-group" style="flex: 1;">
+                            <label>Force Cruising Altitude</label>
+                            <select id="sim-altitude">
+                                <option value="35000">35,000 ft (Optimal)</option>
+                                <option value="25000">25,000 ft (High Drag)</option>
+                            </select>
+                        </div>
+                        <div class="form-group" style="flex: 1;">
+                            <label>Inject Wind Speed (Knots)</label>
+                            <input type="number" id="sim-wind" value="0">
+                        </div>
+                    </div>
+                </div>
+
+                <div id="flight-results" style="display: none; margin-top: 20px;">
+                    <div class="flight-card">
+                        <div><span class="tag">✔️ Active Route</span><b style="font-size: 18px;">Flight AS-4846</b></div>
+                        <div style="text-align: center;"><b style="font-size: 20px;">13:20</b><br><small id="res-origin">DEL</small></div>
+                        <div> ✈️ </div>
+                        <div style="text-align: center;"><b style="font-size: 20px;">15:35</b><br><small id="res-dest">BOM</small></div>
+                        <div style="text-align: right;"><small>Current Base Fare</small><br><b style="font-size: 24px; color: #001b94;">₹6297</b></div>
+                        <div><button class="btn-primary" onclick="alert('Proceeding to seat map...')">Book Seat</button></div>
+                    </div>
+                </div>
+
+            </div>
+
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
