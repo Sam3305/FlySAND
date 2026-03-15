@@ -1,0 +1,269 @@
+{
+  "events_master": [
+    {
+      "event_id": "republic_day",
+      "event_year": 2026,
+      "event_name": "Republic Day Long Weekend",
+      "event_category": "national_holiday",
+      "demand_curve_type": "spike",
+      "peak_date": "2026-01-26",
+      "pre_event_days": 3,
+      "post_event_days": 2,
+      "primary_travel_segment": "leisure_mixed",
+      "elasticity_profile": "moderately_inelastic",
+      "route_impacts": [
+        {
+          "route": "DEL-BOM",
+          "pre_peak_multiplier": 1.25,
+          "post_peak_multiplier": 0.95
+        },
+        {
+          "route": "BOM-DEL",
+          "pre_peak_multiplier": 0.95,
+          "post_peak_multiplier": 1.30
+        },
+        {
+          "route": "DEL-MAA",
+          "pre_peak_multiplier": 1.20,
+          "post_peak_multiplier": 0.90
+        }
+      ],
+      "default_network_multiplier": 1.10
+    },
+    {
+      "event_id": "holi",
+      "event_year": 2026,
+      "event_name": "Holi Festival Travel",
+      "event_category": "cultural_holiday",
+      "demand_curve_type": "spike",
+      "peak_date": "2026-03-04",
+      "pre_event_days": 4,
+      "post_event_days": 3,
+      "primary_travel_segment": "visiting_friends_family",
+      "elasticity_profile": "inelastic",
+      "route_impacts": [
+        {
+          "route": "BOM-DEL",
+          "pre_peak_multiplier": 1.65,
+          "post_peak_multiplier": 0.85
+        },
+        {
+          "route": "DEL-BOM",
+          "pre_peak_multiplier": 0.85,
+          "post_peak_multiplier": 1.55
+        },
+        {
+          "route": "CCU-DEL",
+          "pre_peak_multiplier": 1.45,
+          "post_peak_multiplier": 0.90
+        }
+      ],
+      "default_network_multiplier": 1.15
+    },
+    {
+      "event_id": "ramzan_eid",
+      "event_year": 2026,
+      "event_name": "Eid al-Fitr Travel",
+      "event_category": "religious_holiday",
+      "demand_curve_type": "spike",
+      "peak_date": "2026-03-21",
+      "pre_event_days": 4,
+      "post_event_days": 3,
+      "primary_travel_segment": "visiting_friends_family",
+      "elasticity_profile": "inelastic",
+      "route_impacts": [
+        {
+          "route": "DEL-CCU",
+          "pre_peak_multiplier": 1.40,
+          "post_peak_multiplier": 0.90
+        },
+        {
+          "route": "CCU-DEL",
+          "pre_peak_multiplier": 0.90,
+          "post_peak_multiplier": 1.35
+        },
+        {
+          "route": "BOM-CCU",
+          "pre_peak_multiplier": 1.35,
+          "post_peak_multiplier": 0.95
+        }
+      ],
+      "default_network_multiplier": 1.12
+    },
+    {
+      "event_id": "summer_vacation",
+      "event_year": 2026,
+      "event_name": "Summer School Vacation",
+      "event_category": "school_vacation",
+      "demand_curve_type": "plateau",
+      "start_date": "2026-05-10",
+      "end_date": "2026-06-25",
+      "primary_travel_segment": "leisure_family",
+      "elasticity_profile": "moderately_inelastic",
+      "route_impacts": [
+        {
+          "route": "DEL-BOM",
+          "sustained_multiplier": 1.22
+        },
+        {
+          "route": "BOM-DEL",
+          "sustained_multiplier": 1.20
+        },
+        {
+          "route": "DEL-MAA",
+          "sustained_multiplier": 1.25
+        },
+        {
+          "route": "CCU-MAA",
+          "sustained_multiplier": 1.18
+        }
+      ],
+      "default_network_multiplier": 1.15
+    },
+    {
+      "event_id": "ganesh_chaturthi",
+      "event_year": 2026,
+      "event_name": "Ganesh Chaturthi (Maharashtra Peak)",
+      "event_category": "regional_religious",
+      "demand_curve_type": "spike",
+      "peak_date": "2026-09-05",
+      "pre_event_days": 4,
+      "post_event_days": 5,
+      "primary_travel_segment": "regional_leisure",
+      "elasticity_profile": "inelastic",
+      "route_impacts": [
+        {
+          "route": "DEL-BOM",
+          "pre_peak_multiplier": 1.70,
+          "post_peak_multiplier": 0.85
+        },
+        {
+          "route": "BOM-DEL",
+          "pre_peak_multiplier": 0.85,
+          "post_peak_multiplier": 1.60
+        },
+        {
+          "route": "CCU-BOM",
+          "pre_peak_multiplier": 1.45,
+          "post_peak_multiplier": 0.90
+        }
+      ],
+      "default_network_multiplier": 1.08
+    },
+    {
+      "event_id": "durga_puja",
+      "event_year": 2026,
+      "event_name": "Durga Puja Travel Peak",
+      "event_category": "regional_cultural",
+      "demand_curve_type": "spike",
+      "peak_date": "2026-10-18",
+      "pre_event_days": 6,
+      "post_event_days": 5,
+      "primary_travel_segment": "visiting_friends_family",
+      "elasticity_profile": "highly_inelastic",
+      "route_impacts": [
+        {
+          "route": "DEL-CCU",
+          "pre_peak_multiplier": 1.85,
+          "post_peak_multiplier": 0.80
+        },
+        {
+          "route": "CCU-DEL",
+          "pre_peak_multiplier": 0.80,
+          "post_peak_multiplier": 1.75
+        },
+        {
+          "route": "BOM-CCU",
+          "pre_peak_multiplier": 1.70,
+          "post_peak_multiplier": 0.85
+        }
+      ],
+      "default_network_multiplier": 1.10
+    },
+    {
+      "event_id": "diwali",
+      "event_year": 2026,
+      "event_name": "Diwali Festival Rush",
+      "event_category": "cultural_holiday",
+      "demand_curve_type": "spike",
+      "peak_date": "2026-11-08",
+      "pre_event_days": 7,
+      "post_event_days": 6,
+      "primary_travel_segment": "visiting_friends_family",
+      "elasticity_profile": "highly_inelastic",
+      "route_impacts": [
+        {
+          "route": "BOM-DEL",
+          "pre_peak_multiplier": 2.10,
+          "post_peak_multiplier": 0.75
+        },
+        {
+          "route": "DEL-BOM",
+          "pre_peak_multiplier": 0.90,
+          "post_peak_multiplier": 1.95
+        },
+        {
+          "route": "DEL-CCU",
+          "pre_peak_multiplier": 1.65,
+          "post_peak_multiplier": 0.95
+        }
+      ],
+      "default_network_multiplier": 1.30
+    },
+    {
+      "event_id": "christmas_newyear",
+      "event_year": 2026,
+      "event_name": "Winter Holiday Season",
+      "event_category": "holiday_season",
+      "demand_curve_type": "plateau",
+      "start_date": "2026-12-20",
+      "end_date": "2027-01-05",
+      "primary_travel_segment": "leisure",
+      "elasticity_profile": "highly_inelastic",
+      "route_impacts": [
+        {
+          "route": "DEL-BOM",
+          "sustained_multiplier": 1.45
+        },
+        {
+          "route": "BOM-DEL",
+          "sustained_multiplier": 1.40
+        },
+        {
+          "route": "DEL-MAA",
+          "sustained_multiplier": 1.35
+        },
+        {
+          "route": "CCU-BOM",
+          "sustained_multiplier": 1.30
+        }
+      ],
+      "default_network_multiplier": 1.25
+    },
+    {
+      "event_id": "financial_year_end",
+      "event_year": 2026,
+      "event_name": "Financial Year Closing Travel",
+      "event_category": "corporate_cycle",
+      "demand_curve_type": "spike",
+      "peak_date": "2026-03-31",
+      "pre_event_days": 7,
+      "post_event_days": 2,
+      "primary_travel_segment": "business",
+      "elasticity_profile": "business_inelastic",
+      "route_impacts": [
+        {
+          "route": "DEL-BOM",
+          "pre_peak_multiplier": 1.40,
+          "post_peak_multiplier": 1.10
+        },
+        {
+          "route": "BOM-DEL",
+          "pre_peak_multiplier": 1.40,
+          "post_peak_multiplier": 1.10
+        }
+      ],
+      "default_network_multiplier": 1.05
+    }
+  ]
+}

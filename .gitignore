@@ -29,7 +29,7 @@ build/
 *.pkl
 *.joblib
 *.h5
-
+*.docx
 # Keep config files
 !backend/services/*_config.json
 
