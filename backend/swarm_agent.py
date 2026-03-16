@@ -74,7 +74,7 @@ async def generate_swarm():
     
     # Create 50 random agents
     tasks = []
-    for _ in range(50):
+    for _ in range(1000):
         random_persona = random.choice(personas)
         agent = PassengerAgent(random_persona)
         # Random sleep simulates realistic human click delays
