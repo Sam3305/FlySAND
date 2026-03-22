@@ -1,0 +1,34 @@
+{
+  "name": "indigo-ops-platform",
+  "version": "1.0.0",
+  "private": true,
+  "description": "IndiGo dual-app platform: B2C booking portal + B2B AOCC dashboard",
+  "scripts": {
+    "dev":     "vite",
+    "build":   "tsc && vite build",
+    "preview": "vite preview",
+    "lint":    "eslint src --ext .ts,.tsx --report-unused-disable-directives --max-warnings 0",
+    "test":    "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "lucide-react": "^0.383.0",
+    "lodash":       "^4.17.21",
+    "recharts":     "^2.12.7",
+    "react":        "^18.3.1",
+    "react-dom":    "^18.3.1",
+    "zustand":      "^4.5.4"
+  },
+  "devDependencies": {
+    "@types/lodash":          "^4.17.6",
+    "@types/react":           "^18.3.3",
+    "@types/react-dom":       "^18.3.0",
+    "@typescript-eslint/eslint-plugin": "^7.15.0",
+    "@typescript-eslint/parser":        "^7.15.0",
+    "@vitejs/plugin-react":   "^4.3.1",
+    "eslint":                 "^9.7.0",
+    "typescript":             "^5.5.3",
+    "vite":                   "^5.3.4",
+    "vitest":                 "^1.6.0"
+  }
+}

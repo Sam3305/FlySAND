@@ -36,3 +36,35 @@ build/
 # OS generated files
 .DS_Store
 Thumbs.db
+
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Build output
+dist/
+dist-ssr/
+
+# Test coverage
+coverage/
+
+# Environment — NEVER commit secrets
+.env
+.env.local
+.env.*.local
+.venv/*
+# Editor
+.vscode/*
+!.vscode/extensions.json
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+
+# Vite
+*.local
+vite.config.ts.timestamp-*

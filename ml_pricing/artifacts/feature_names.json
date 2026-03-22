@@ -1,0 +1,74 @@
+{
+  "numeric_features": [
+    "days_to_departure",
+    "dep_hour",
+    "journey_month",
+    "journey_dow",
+    "is_weekend_travel",
+    "is_morning_rush",
+    "is_midday",
+    "is_red_eye",
+    "is_golden_quad",
+    "stops_numeric",
+    "duration_minutes",
+    "simulated_base_cost_inr",
+    "event_demand_multiplier"
+  ],
+  "categorical_features": [
+    "source_city",
+    "destination_city",
+    "class"
+  ],
+  "all_features": [
+    "days_to_departure",
+    "dep_hour",
+    "journey_month",
+    "journey_dow",
+    "is_weekend_travel",
+    "is_morning_rush",
+    "is_midday",
+    "is_red_eye",
+    "is_golden_quad",
+    "stops_numeric",
+    "duration_minutes",
+    "simulated_base_cost_inr",
+    "event_demand_multiplier",
+    "source_city",
+    "destination_city",
+    "class"
+  ],
+  "target_transform": "log1p",
+  "margin_floor_mult": 1.15,
+  "cat_vocabs": {
+    "source_city": [
+      "Bangalore",
+      "Chennai",
+      "Delhi",
+      "Hyderabad",
+      "Kolkata",
+      "Mumbai"
+    ],
+    "destination_city": [
+      "Bangalore",
+      "Chennai",
+      "Delhi",
+      "Hyderabad",
+      "Kolkata",
+      "Mumbai"
+    ],
+    "class": [
+      "Economy"
+    ]
+  },
+  "validation_metrics": {
+    "MAE_INR": 2273.94,
+    "RMSE_INR": 3669.51,
+    "MAPE_pct": 19.6618,
+    "Ratio_MAE": 0.1791,
+    "Avg_predicted_ratio": 0.6323,
+    "Margin_Compliance_pct": 2.34,
+    "MAE_after_enforcer_INR": 6890.43,
+    "Best_Iteration": 723,
+    "Train_rows": 8624
+  }
+}
