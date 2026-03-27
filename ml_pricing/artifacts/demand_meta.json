@@ -1,0 +1,73 @@
+{
+  "numeric_features": [
+    "days_left",
+    "duration_hrs",
+    "is_economy",
+    "is_golden_quad",
+    "dep_hour",
+    "is_morning",
+    "is_evening",
+    "is_night",
+    "journey_dow",
+    "is_weekend",
+    "simulated_floor"
+  ],
+  "categorical_features": [
+    "source_city",
+    "destination_city"
+  ],
+  "all_features": [
+    "days_left",
+    "duration_hrs",
+    "is_economy",
+    "is_golden_quad",
+    "dep_hour",
+    "is_morning",
+    "is_evening",
+    "is_night",
+    "journey_dow",
+    "is_weekend",
+    "simulated_floor",
+    "source_city",
+    "destination_city"
+  ],
+  "target": "log1p(willingness_ratio)",
+  "inflation_factor": 1.5,
+  "cat_vocabs": {
+    "source_city": [
+      "Bangalore",
+      "Chennai",
+      "Delhi",
+      "Hyderabad",
+      "Kolkata",
+      "Mumbai"
+    ],
+    "destination_city": [
+      "Bangalore",
+      "Chennai",
+      "Delhi",
+      "Hyderabad",
+      "Kolkata",
+      "Mumbai"
+    ]
+  },
+  "validation_metrics": {
+    "MAE_INR": 1346.79,
+    "RMSE_INR": 2728.81,
+    "MAPE_pct": 7.7265,
+    "Ratio_MAE": 0.2585,
+    "Best_Iteration": 347,
+    "Val_rows": 7201
+  },
+  "train_rows": 28803,
+  "val_rows": 7201,
+  "airlines_trained_on": [
+    "Vistara",
+    "Air_India",
+    "Indigo",
+    "GO_FIRST",
+    "AirAsia",
+    "SpiceJet"
+  ],
+  "description": "Predicts willingness_to_pay_ratio = price / operating_floor. Trained on all Indian airlines \u2014 captures market demand behaviour, not airline-specific pricing. Used by swarm agents to decide whether current_fare <= floor * predicted_ratio."
+}

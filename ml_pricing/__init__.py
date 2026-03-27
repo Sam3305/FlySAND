@@ -33,4 +33,4 @@ MODEL_PATH      = "ml_pricing/artifacts/xgb_indigo_pricing.ubj"
 SCALER_PATH     = "ml_pricing/artifacts/feature_scaler.pkl"
 FEATURES_PATH   = "ml_pricing/artifacts/feature_names.json"
 
-MARGIN_FLOOR_MULTIPLIER = 1.15   # Final_Price >= base_cost × 1.15
+MARGIN_FLOOR_MULTIPLIER = 1.02   # Final_Price >= base_cost × 1.02

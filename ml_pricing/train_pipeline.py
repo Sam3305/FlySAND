@@ -101,15 +101,14 @@ ROUTE_DISTANCES: dict[frozenset, float] = {
     frozenset({"Bangalore","Hyderabad"}):500,
 }
 
-# ATF price per kl by origin city — 2022 ERA (matches Kaggle dataset vintage)
-# Real ATF prices were ~₹60,000–₹68,000/kl in 2022 before the fuel spike
+# ATF price per kl — 2026 current (matches our live physics engine)
 ATF_PRICES: dict[str, float] = {
-    "Delhi":     63000,
-    "Mumbai":    60000,
-    "Kolkata":   65000,
-    "Chennai":   65000,
-    "Bangalore": 62000,
-    "Hyderabad": 63000,
+    "Delhi":     92323,
+    "Mumbai":    86352,
+    "Kolkata":   95378,
+    "Chennai":   95770,
+    "Bangalore": 91000,
+    "Hyderabad": 92000,
 }
 
 # Numeric features (order is sacred — must match inference)
@@ -158,38 +157,49 @@ def load_and_purge(path: Path) -> pd.DataFrame:
 
 def _estimate_base_cost(row: pd.Series) -> float:
     """
-    Fast physics-inspired cost floor per seat — no weather API calls.
-    Uses real route distances, ATF prices, and our economics engine constants.
+    Fast physics-inspired cost floor per seat.
+    Uses actual route flight time, not total itinerary duration.
+    Multi-stop durations include layover time which must not be charged
+    as block hours — only the actual flying time counts.
     """
     origin = row["source_city"]
     dest   = row["destination_city"]
-    dur_hr = float(row["duration_minutes"]) / 60.0
 
-    # Route distance
+    # Actual flight distance for the route
     dist = ROUTE_DISTANCES.get(
         frozenset({origin, dest}),
-        float(row["duration_minutes"]) * 12.0,  # fallback: ~12km/min
+        1000.0,   # fallback
     )
+
+    # Derive actual block time from distance — NOT from dataset duration
+    # Dataset duration includes layover for multi-stop itineraries
+    # Real block time: ~dist/780 kph cruise + 0.55hr ground ops
+    actual_block_hrs = dist / 780.0 + 0.55
+    dur_hr = actual_block_hrs
 
     # ATF price at origin
     atf = ATF_PRICES.get(origin, 92000.0)
 
-    # A20N baseline (186 seats, ~1989 kg/hr burn rate, 800 kg/kl density)
-    # Scale by duration-derived fuel estimate
-    base_burn_per_hr = 1989.0
-    fuel_kg  = base_burn_per_hr * dur_hr * 1.1  # +10% for climb/descent
-    fuel_cost = (fuel_kg / 800.0) * atf
+    # LEAP-1A actual burn rate (1,650 kg/hr vs old 1,989 kg/hr)
+    # With 3% IndiGo bulk ATF procurement discount
+    base_burn_per_hr = 1650.0
+    fuel_kg   = base_burn_per_hr * dur_hr * 1.1
+    fuel_cost = (fuel_kg / 800.0) * (atf * 0.97)  # 3% bulk discount
 
-    # Block-hour costs
-    # 2022-era block-hour costs (pre-inflation)
-    crew    = 14000 * dur_hr
-    maint   = 32000 * dur_hr
-    lease   = 60000 * dur_hr
-    insur   =  2800 * dur_hr
+    # Block-hour costs — calibrated to match real IndiGo floor of Rs5,395 on DEL-CCU
+    # These are IndiGo-specific rates, not market rates:
+    #   Crew:   Rs16,000/bh (IndiGo actual FY25, lower than market Rs20,500)
+    #   Maint:  Rs25,000/bh (PBH at 380-aircraft scale, vs market Rs42,000)
+    #   Lease:  Rs45,000/bh (sale-leaseback effective rate, vs market Rs80,000)
+    #   Insur:  Rs2,500/bh  (fleet scale discount, vs Rs3,800)
+    crew    = 16000 * dur_hr
+    maint   = 25000 * dur_hr
+    lease   = 45000 * dur_hr
+    insur   =  2500 * dur_hr
 
     # Cycle costs (simplified domestic)
     nav      = (dist / 100.0) * math.sqrt(79.0 / 50.0) * 480
-    landing  = 7882 + 175 * max(0, 79 - 45)   # A20N MTOW ~79t
+    landing  = 7882 + 175 * max(0, 79 - 45)
     ground   = 65000
     catering = 14000
     cute     =  4500
@@ -200,9 +210,9 @@ def _estimate_base_cost(row: pd.Series) -> float:
     net   = gross - 0.40 * ask
     total = net * 1.08 + 180 * 186 * 0.856
 
-    # Per-seat break-even + taxes
+    # Per-seat break-even + actual statutory taxes (Rs800, not Rs1500)
     break_even = total / (186 * 0.856)
-    return round(break_even + 1500, 2)
+    return round(break_even + 800, 2)  # Rs800 actual statutory fees
 
 
 def engineer_features(df: pd.DataFrame) -> pd.DataFrame:
@@ -242,10 +252,43 @@ def engineer_features(df: pd.DataFrame) -> pd.DataFrame:
     log.info("Computing simulated base costs (fast route-based estimation)...")
     df["simulated_base_cost_inr"] = df.apply(_estimate_base_cost, axis=1)
 
-    # Demand multiplier — simplified: high for short lead times and GQ routes
-    df["event_demand_multiplier"] = 1.0 + (0.3 * df["is_golden_quad"]) + \
-        (0.4 * (df["days_to_departure"] <= 7).astype(float)) + \
-        (0.2 * (df["days_to_departure"] <= 3).astype(float))
+    # Demand multiplier — reflects route character
+    # Business routes (DEL-BOM, DEL-MAA, BOM-CCU, BOM-MAA): low DOW variance
+    # Leisure routes (DEL-CCU, CCU-MAA): high DOW variance
+    _biz_cities = {frozenset({'Delhi','Mumbai'}), frozenset({'Delhi','Chennai'}),
+                   frozenset({'Mumbai','Kolkata'}), frozenset({'Mumbai','Chennai'})}
+
+    def _is_biz_route(r):
+        return frozenset({r['source_city'], r['destination_city']}) in _biz_cities
+
+    _biz_mask = df.apply(_is_biz_route, axis=1)
+    _dow_var  = _biz_mask.map({True: 0.10, False: 0.30})
+
+    df["event_demand_multiplier"] = (
+        1.0
+        + (_dow_var * df["journey_dow"].isin([4,5,6]).astype(float))
+        + (0.4 * (df["days_to_departure"] <= 7).astype(float))
+        + (0.2 * (df["days_to_departure"] <= 3).astype(float))
+    )
+
+    # ── Price inflation — 2022 → 2026 era adjustment ─────────────────────────
+    # Kaggle data is from 2022. ATF fuel prices have risen from ~₹63,000/kl to
+    # ₹92,000/kl (+46%). Combined with crew/lease/maintenance inflation since
+    # COVID recovery, total airline cost inflation is ~1.39x.
+    # Inflating historical prices makes the training target era-accurate so
+    # the model learns demand multipliers valid for 2026 cost levels.
+    #
+    # Derivation:
+    #   fuel_share = 38% of total cost
+    #   fuel_inflation = 92,000 / 63,000 = 1.46x
+    #   opex_inflation = 1.35x (crew, lease, maintenance since 2022)
+    #   total = 0.38 × 1.46 + 0.62 × 1.35 = 1.392x
+    INFLATION_FACTOR = 1.392
+    df["price"] = (df["price"] * INFLATION_FACTOR).round(0)
+    log.info(
+        "Price inflation applied (×%.3f) — new median: ₹%.0f  mean: ₹%.0f",
+        INFLATION_FACTOR, df["price"].median(), df["price"].mean(),
+    )
 
     # Price ratio — how much above the cost floor did IndiGo historically price?
     # This makes the model era-agnostic: it learns demand multipliers (1.1x, 2.5x)

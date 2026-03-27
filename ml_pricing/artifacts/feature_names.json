@@ -61,14 +61,14 @@
     ]
   },
   "validation_metrics": {
-    "MAE_INR": 2273.94,
-    "RMSE_INR": 3669.51,
-    "MAPE_pct": 19.6618,
-    "Ratio_MAE": 0.1791,
-    "Avg_predicted_ratio": 0.6323,
-    "Margin_Compliance_pct": 2.34,
-    "MAE_after_enforcer_INR": 6890.43,
-    "Best_Iteration": 723,
+    "MAE_INR": 3043.03,
+    "RMSE_INR": 5080.79,
+    "MAPE_pct": 18.742,
+    "Ratio_MAE": 0.5882,
+    "Avg_predicted_ratio": 1.9689,
+    "Margin_Compliance_pct": 100.0,
+    "MAE_after_enforcer_INR": 3043.03,
+    "Best_Iteration": 418,
     "Train_rows": 8624
   }
 }
