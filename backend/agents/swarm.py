@@ -72,6 +72,7 @@ import os
 import random
 import sys
 from datetime import date, datetime, timezone
+from pathlib import Path
 from typing import Any
 
 import aiohttp
@@ -91,9 +92,112 @@ logger = logging.getLogger("aerosync.swarm")
 
 # ── Config ────────────────────────────────────────────────────────────────────
 API_BASE    = os.getenv("API_BASE",  "http://localhost:8000")
-N_AGENTS    = int(os.getenv("N_AGENTS", "500"))
+N_AGENTS    = int(os.getenv("N_AGENTS", "100"))
 FLIGHTS_URL = f"{API_BASE}/api/v1/flights"
 BOOK_URL    = f"{API_BASE}/api/v1/book"
+
+
+# =============================================================================
+# DEMAND MODEL — market willingness-to-pay predictor
+# =============================================================================
+
+_demand_model   = None
+_demand_scaler  = None
+_demand_meta    = None
+_demand_ready   = False
+
+_REPO_ROOT = Path(__file__).resolve().parent.parent
+_DM_MODEL  = _REPO_ROOT / "ml_pricing/artifacts/demand_model.ubj"
+_DM_SCALER = _REPO_ROOT / "ml_pricing/artifacts/demand_scaler.pkl"
+_DM_META   = _REPO_ROOT / "ml_pricing/artifacts/demand_meta.json"
+
+_GQ_PAIRS = {
+    frozenset({"Delhi","Mumbai"}),   frozenset({"Delhi","Kolkata"}),
+    frozenset({"Delhi","Chennai"}),  frozenset({"Mumbai","Kolkata"}),
+    frozenset({"Mumbai","Chennai"}), frozenset({"Kolkata","Chennai"}),
+}
+_IATA_TO_CITY = {"DEL":"Delhi","BOM":"Mumbai","CCU":"Kolkata","MAA":"Chennai"}
+_DEP_HOUR    = {"A": 6, "B": 12, "C": 18}
+
+def _load_demand_model() -> bool:
+    global _demand_model, _demand_scaler, _demand_meta, _demand_ready
+    if _demand_ready:
+        return True
+    if not _DM_MODEL.exists():
+        logger.warning("Demand model not found — using hardcoded ceilings. "
+                       "Run: python -m ml_pricing.demand_model")
+        return False
+    try:
+        import xgboost as xgb, joblib, json as _json, numpy as _np
+        _demand_model = xgb.XGBRegressor()
+        _demand_model.load_model(str(_DM_MODEL))
+        _demand_scaler = joblib.load(str(_DM_SCALER))
+        with open(_DM_META) as f:
+            _demand_meta = _json.load(f)
+        _demand_ready = True
+        logger.info("Demand model loaded — agents now use market willingness-to-pay")
+        return True
+    except Exception as e:
+        logger.warning("Demand model load failed: %s — hardcoded ceilings", e)
+        return False
+
+
+def predict_willingness(
+    origin: str, destination: str,
+    days_left: int, slot: str,
+    is_economy: bool = True,
+    floor_price: float = 5500.0,
+) -> float:
+    """
+    Predict the willingness-to-pay ratio for this booking context.
+    Returns: ratio such that agent books if current_fare <= floor * ratio.
+
+    Falls back to hardcoded ratios if model not available.
+    """
+    import numpy as _np
+
+    origin_city = _IATA_TO_CITY.get(origin, origin)
+    dest_city   = _IATA_TO_CITY.get(destination, destination)
+    dep_hr      = _DEP_HOUR.get(slot, 12)
+    is_gq       = int(frozenset({origin_city, dest_city}) in _GQ_PAIRS)
+    dow         = days_left % 7
+
+    if not _demand_ready or _demand_meta is None:
+        # Hardcoded fallback ratios by days_left bucket
+        if days_left <= 3:    return 1.68
+        elif days_left <= 7:  return 1.17
+        elif days_left <= 21: return 1.00
+        else:                 return 1.10
+    try:
+        numeric_vals = [
+            days_left,
+            1.8,                               # duration_hrs proxy
+            # stops_numeric removed — nonstop only
+            int(is_economy),
+            is_gq,
+            dep_hr,
+            int(6 <= dep_hr <= 9),             # is_morning
+            int(17 <= dep_hr <= 20),           # is_evening
+            int(dep_hr >= 21),                 # is_night
+            dow,
+            int(dow in {4, 5, 6}),             # is_weekend
+            floor_price,
+        ]
+        vocabs = _demand_meta.get("cat_vocabs", {})
+        def enc(col, val):
+            v = vocabs.get(col, [])
+            try:    return float(v.index(val))
+            except: return -1.0
+        cat_vals = [enc("source_city", origin_city), enc("destination_city", dest_city)]
+
+        row    = _np.array(numeric_vals + cat_vals, dtype=float).reshape(1, -1)
+        n_num  = len(_demand_meta["numeric_features"])
+        row[0, :n_num] = _demand_scaler.transform(row[:, :n_num])[0]
+        ratio  = float(_np.expm1(_demand_model.predict(row)[0]))
+        return max(ratio, 1.0)   # never book below floor
+    except Exception as e:
+        logger.debug("Demand model inference error: %s", e)
+        return 1.10
 
 
 # =============================================================================
@@ -134,28 +238,30 @@ def poisson_sleep(days: int) -> float:
 
 
 # =============================================================================
-# AGENT PERSONALITY — price ceiling distribution
+# AGENT PERSONALITY — market-driven willingness distribution
 # =============================================================================
+# Each persona samples at a different quantile of the real market distribution
+# learned from 300,153 Indian airline bookings across 6 airlines.
+# willingness_mult is applied ON TOP of the demand model prediction.
 
 PERSONALITY_DIST = [
-    # (weight, label, price_ceiling_INR, seats_booked)
-    (0.40, "STUDENT",    4_500,  1),   # Budget-conscious, books only cheap fares
-    (0.35, "LEISURE",    7_000,  1),   # Moderate sensitivity
-    (0.25, "BUSINESS",  15_000,  2),   # Price-insensitive, sometimes books 2 seats
+    # (weight, label, willingness_mult, seats, dtd_pref)
+    (0.40, "STUDENT",  0.78, 1, "far"),    # price-sensitive, books far-out
+    (0.35, "LEISURE",  1.00, 1, "mid"),    # median market behaviour
+    (0.25, "BUSINESS", 1.35, 2, "close"),  # inelastic, books close-in
 ]
 
-def pick_personality() -> tuple[str, float, int]:
-    """Returns (label, price_ceiling_inr, seats_to_book)."""
+def pick_personality() -> tuple[str, float, int, str]:
+    """Returns (label, willingness_mult, seats_to_book, dtd_pref)."""
     r = random.random()
     cumulative = 0.0
-    for weight, label, ceiling, seats in PERSONALITY_DIST:
+    for weight, label, mult, seats, dtd in PERSONALITY_DIST:
         cumulative += weight
         if r <= cumulative:
-            # Add ±15% personal variance so not all students have identical ceiling
-            variance = ceiling * 0.15
-            personal_ceiling = ceiling + random.uniform(-variance, variance)
-            return label, personal_ceiling, seats
-    return PERSONALITY_DIST[-1][1], PERSONALITY_DIST[-1][2], PERSONALITY_DIST[-1][3]
+            personal_mult = mult * (1.0 + random.uniform(-0.10, 0.10))
+            return label, personal_mult, seats, dtd
+    last = PERSONALITY_DIST[-1]
+    return last[1], last[2], last[3], last[4]
 
 
 # =============================================================================
@@ -256,12 +362,15 @@ async def agent_loop(agent_idx: int, session: aiohttp.ClientSession) -> None:
       6. Pick one flight, book it, log the result.
       7. Sleep for poisson_sleep(days_to_flight) before next attempt.
     """
-    agent_id    = f"AGENT_{agent_idx:03d}"
-    label, price_ceiling, seats = pick_personality()
+    agent_id = f"AGENT_{agent_idx:03d}"
+    label, willingness_mult, seats, dtd_pref = pick_personality()
+
+    # Load demand model once at agent start
+    _load_demand_model()
 
     logger.info(
-        "Agent %s started — type=%s ceiling=₹%.0f seats=%d",
-        agent_id, label, price_ceiling, seats,
+        "Agent %s started — type=%s willingness=%.2fx seats=%d dtd=%s",
+        agent_id, label, willingness_mult, seats, dtd_pref,
     )
 
     today = date.today()
@@ -271,10 +380,17 @@ async def agent_loop(agent_idx: int, session: aiohttp.ClientSession) -> None:
             # ── 1. Pick route ─────────────────────────────────────────────────
             origin, dest = random.choice(GQ_ROUTES)
 
-            # ── 2. Pick date (weighted toward near-future) ────────────────────
-            # beta(1.5, 4) peaks around day 5–8 but has a long tail to day 30.
+            # ── 2. Pick date — biased by persona DTD preference ───────────────
             from datetime import timedelta
-            raw_offset   = int(random.betavariate(1.5, 4.0) * 29) + 1
+            if dtd_pref == "close":
+                # Business: beta skewed very close-in (peaks D+2-4)
+                raw_offset = int(random.betavariate(1.0, 6.0) * 14) + 1
+            elif dtd_pref == "far":
+                # Student: beta skewed far-out (peaks D+18-25)
+                raw_offset = int(random.betavariate(2.0, 1.5) * 29) + 1
+            else:
+                # Leisure: original distribution (peaks D+5-8)
+                raw_offset = int(random.betavariate(1.5, 4.0) * 29) + 1
             day_offset   = max(1, min(30, raw_offset))
             dep_date_obj = today + timedelta(days=day_offset)
             dep_date_str = dep_date_obj.strftime("%Y-%m-%d")
@@ -291,18 +407,36 @@ async def agent_loop(agent_idx: int, session: aiohttp.ClientSession) -> None:
                 await asyncio.sleep(poisson_sleep(days_to_flt))
                 continue
 
-            # ── 5. Filter by price ceiling and availability ───────────────────
-            affordable = [
-                f for f in flights
-                if f.get("status") == "scheduled"
-                and (f.get("current_pricing") or {}).get("ml_fare_inr", 999_999) <= price_ceiling
-                and (f.get("inventory") or {}).get("available", 0) >= seats
-            ]
+            # ── 5. Filter by market willingness-to-pay (model-driven) ─────────
+            # For each flight, ask the demand model:
+            # "Given this context, what ratio above floor is a real traveller
+            #  willing to pay?" Then apply persona multiplier on top.
+            affordable = []
+            for f in flights:
+                if f.get("status") != "scheduled":
+                    continue
+                if (f.get("inventory") or {}).get("available", 0) < seats:
+                    continue
+                cp    = f.get("current_pricing") or {}
+                fare  = cp.get("ml_fare_inr", 999_999)
+                floor = cp.get("floor_inr", fare)
+                if floor <= 0:
+                    continue
+                slot = (f.get("flight_id") or "").split("_")[1] if "_" in (f.get("flight_id") or "") else "B"
+                # Market willingness × persona multiplier = personal ceiling
+                market_ratio  = predict_willingness(
+                    origin=origin, destination=dest,
+                    days_left=days_to_flt, slot=slot,
+                    floor_price=floor,
+                )
+                personal_ceil = floor * market_ratio * willingness_mult
+                if fare <= personal_ceil:
+                    affordable.append(f)
 
             if not affordable:
                 logger.info(
-                    "%s [%s] no affordable flights %s→%s on %s (ceiling=₹%.0f)",
-                    agent_id, label, origin, dest, dep_date_str, price_ceiling,
+                    "%s [%s] nothing within willingness %s→%s D+%d",
+                    agent_id, label, origin, dest, days_to_flt,
                 )
                 await asyncio.sleep(poisson_sleep(days_to_flt))
                 continue
@@ -370,9 +504,10 @@ async def run_swarm() -> None:
     logger.info("  Days 3–7  → sleep 20–60s/attempt   (business surge)")
     logger.info("  Days <3   → sleep 3–15s/attempt    (last-minute panic)")
     logger.info("")
-    logger.info("Agent mix:")
-    for _, label, ceiling, seats in PERSONALITY_DIST:
-        logger.info("  %-10s ceiling=₹%-6d books %d seat(s)", label, ceiling, seats)
+    logger.info("Agent mix (market demand model):")
+    for _, label, mult, seats, dtd in PERSONALITY_DIST:
+        logger.info("  %-10s willingness=%.2fx  seats=%d  prefers=%s",
+                    label, mult, seats, dtd)
     logger.info("=" * 64)
 
     # Verify API is reachable before spawning agents
