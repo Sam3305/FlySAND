@@ -1,21 +1,16 @@
 import React, { useState, useCallback } from "react";
 import { Plane, Loader } from "lucide-react";
-import type { AirportCode, Flight, FlightStatus, LiveFlightState } from "../../types";
+import type { AirportCode, Flight, FlightStatus } from "../../types";
 import { AIRPORTS } from "../../constants";
 import { B2CNav }      from "./B2CNav";
 import { SearchHero }  from "./SearchHero";
 import { FlightCard }  from "./FlightCard";
-import { WsStatusBadge } from "../shared/WsStatusBadge";
 
 interface SearchParams {
   from:       AirportCode;
   to:         AirportCode;
   date:       string;
   passengers: number;
-}
-
-interface Props {
-  live: LiveFlightState;
 }
 
 // Slot → departure/arrival times (IST)
@@ -59,7 +54,7 @@ function docToFlight(doc: Record<string, unknown>): Flight {
   };
 }
 
-export const B2CPortal: React.FC<Props> = ({ live }) => {
+export const B2CPortal: React.FC = () => {
   const [flights,    setFlights]    = useState<Flight[]>([]);
   const [loading,    setLoading]    = useState(false);
   const [error,      setError]      = useState("");
@@ -125,12 +120,7 @@ export const B2CPortal: React.FC<Props> = ({ live }) => {
                 </p>
               )}
             </div>
-            <WsStatusBadge
-              connected={live.connected}
-              eventCount={live.eventCount}
-              swarmActive={live.swarmActive}
-              variant="b2c"
-            />
+
           </div>
         )}
 

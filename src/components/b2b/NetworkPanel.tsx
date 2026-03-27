@@ -1,67 +1,154 @@
-import React from "react";
-import { T, AIRPORTS, AIRPORT_CODES } from "../../constants";
-import { formatINR } from "../../utils";
-import type { Flight } from "../../types";
+import React, { useEffect, useState } from "react";
+import { API_BASE } from "../../constants";
+import type { NetworkReport } from "../../types";
+import { Globe, ArrowUpRight, ArrowDownRight, Minus, Rocket } from "lucide-react";
 
-interface Props {
-  flights: Flight[];
-}
+export const NetworkPanel: React.FC = () => {
+  const [report,  setReport]  = useState<NetworkReport | null>(null);
+  const [loading, setLoading] = useState(true);
 
-export const NetworkPanel: React.FC<Props> = ({ flights }) => (
-  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-    {/* ── Airport tiles ── */}
-    <div style={{ border: `1px solid ${T.border}`, background: T.panel, padding: "8px 12px" }}>
-      <div style={{ fontSize: 10, fontWeight: 700, color: T.green, letterSpacing: "0.1em", marginBottom: 8 }}>
-        ▌ NETWORK SCOPE
-      </div>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
-        {AIRPORT_CODES.map((code) => {
-          const ops = flights.filter((f) => f.from === code || f.to === code).length;
-          return (
-            <div key={code} style={{ border: `1px solid ${T.border}`, padding: "8px 10px" }}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: T.cyan }}>{code}</div>
-              <div style={{ fontSize: 9, color: T.textDm }}>{AIRPORTS[code].city}</div>
-              <div style={{ fontSize: 9, color: T.textDm, marginTop: 2 }}>
-                Terminal {AIRPORTS[code].terminal}
-              </div>
-              <div style={{ fontSize: 9, color: T.green, marginTop: 2 }}>{ops} FLT</div>
-            </div>
-          );
-        })}
-      </div>
-    </div>
+  useEffect(() => {
+    const fetch_ = async () => {
+      try {
+        const res  = await fetch(`${API_BASE}/api/v1/reports/network`);
+        const data = await res.json();
+        setReport(data);
+      } catch { /* backend not ready */ }
+      finally { setLoading(false); }
+    };
+    fetch_();
+    const t = setInterval(fetch_, 60_000);
+    return () => clearInterval(t);
+  }, []);
 
-    {/* ── Revenue snapshot ── */}
-    <div style={{ border: `1px solid ${T.border}`, background: T.panel, padding: "8px 12px" }}>
-      <div style={{ fontSize: 10, fontWeight: 700, color: T.amber, letterSpacing: "0.1em", marginBottom: 8 }}>
-        ▌ REV SNAPSHOT
-      </div>
-      {flights.map((f) => {
-        // Estimated revenue = price × load% × 1.7 (proxy for seat count)
-        const estRev = f.price * f.load * 1.7;
-        return (
-          <div key={f.id} style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            padding: "3px 0",
-            borderBottom: `1px solid ${T.border}`,
+  const score = report?.network_efficiency_score;
+
+  return (
+    <div style={cardStyle}>
+      {/* Header */}
+      <div style={headerStyle}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <Globe size={16} color="#7C3AED" />
+          <span style={{ fontWeight: 700, fontSize: 13, color: "#1A1A2E" }}>Network Insights</span>
+        </div>
+        {score && (
+          <span style={{
+            fontSize: 10, fontWeight: 700,
+            color: score.score >= 7 ? "#059669" : score.score >= 5 ? "#D97706" : "#DC2626",
+            background: score.score >= 7 ? "#ECFDF5" : score.score >= 5 ? "#FFFBEB" : "#FEF2F2",
+            padding: "3px 8px", borderRadius: 6,
           }}>
-            <span style={{ fontSize: 9, color: T.cyan }}>{f.id}</span>
-            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-              <span style={{ fontSize: 9, color: T.textDm, fontVariantNumeric: "tabular-nums" }}>
-                ₹{formatINR(estRev)}
-              </span>
-              <span style={{
-                fontSize: 9,
-                color: f._dir === "up" ? T.green : f._dir === "down" ? T.red : T.textDm,
-              }}>
-                {f._dir === "up" ? "▲" : f._dir === "down" ? "▼" : "─"}
-              </span>
-            </div>
+            {score.score}/{score.out_of}
+          </span>
+        )}
+      </div>
+
+      <div style={{ overflowY: "auto", flex: 1, padding: "14px 18px" }}>
+        {loading && (
+          <p style={{ fontSize: 12, color: "#9CA3AF" }}>Loading…</p>
+        )}
+
+        {!loading && (!report || !report.available) && (
+          <div style={{ fontSize: 12, color: "#9CA3AF", lineHeight: 1.8, textAlign: "center", padding: "24px 0" }}>
+            <Globe size={28} style={{ opacity: 0.15, marginBottom: 8 }} />
+            <p>No network report yet.</p>
+            <code style={{ fontSize: 10, color: "#7C3AED", background: "#F5F3FF", padding: "4px 10px", borderRadius: 6, display: "inline-block", marginTop: 6 }}>
+              python -m agents.network_planner
+            </code>
           </div>
-        );
-      })}
+        )}
+
+        {report?.available && (
+          <>
+            {report.executive_summary && (
+              <p style={{ fontSize: 12, color: "#374151", lineHeight: 1.7, marginBottom: 14 }}>
+                {report.executive_summary}
+              </p>
+            )}
+
+            {/* Frequency decisions */}
+            {report.frequency_decisions && report.frequency_decisions.length > 0 && (
+              <div style={{ marginBottom: 14 }}>
+                <div style={{ fontSize: 10, fontWeight: 700, color: "#6B7280", letterSpacing: "0.08em", marginBottom: 8 }}>
+                  FREQUENCY DECISIONS
+                </div>
+                {report.frequency_decisions.slice(0, 4).map((d, i) => {
+                  const Icon = d.action === "ADD" ? ArrowUpRight : d.action === "CUT" ? ArrowDownRight : Minus;
+                  const col  = d.action === "ADD" ? "#059669" : d.action === "CUT" ? "#DC2626" : "#6B7280";
+                  return (
+                    <div key={i} style={{
+                      fontSize: 11, marginBottom: 5, display: "flex", alignItems: "center", gap: 6,
+                      background: `${col}08`, padding: "5px 10px", borderRadius: 8,
+                    }}>
+                      <Icon size={12} color={col} />
+                      <span style={{ color: "#0F3CC9", fontWeight: 600, minWidth: 60 }}>{d.route}</span>
+                      <span style={{ color: "#6B7280" }}>{d.current}→{d.recommended}/day</span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Growth opportunities */}
+            {report.growth_opportunities && report.growth_opportunities.length > 0 && (
+              <div style={{ marginBottom: 12 }}>
+                <div style={{ fontSize: 10, fontWeight: 700, color: "#6B7280", letterSpacing: "0.08em", marginBottom: 8 }}>
+                  OPPORTUNITIES
+                </div>
+                {report.growth_opportunities.slice(0, 3).map((g, i) => (
+                  <div key={i} style={{ fontSize: 11, marginBottom: 5, display: "flex", alignItems: "flex-start", gap: 6 }}>
+                    <Rocket size={12} color="#7C3AED" style={{ marginTop: 2, flexShrink: 0 }} />
+                    <div>
+                      <span style={{ color: "#7C3AED", fontWeight: 600 }}>{g.route}</span>
+                      <span style={{ color: "#6B7280" }}> — {g.finding}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {score?.justification && (
+              <div style={{
+                background: "#F5F3FF", borderRadius: 10, padding: "10px 14px",
+                borderLeft: "3px solid #7C3AED",
+              }}>
+                <div style={{ fontSize: 10, fontWeight: 700, color: "#7C3AED", letterSpacing: "0.06em", marginBottom: 2 }}>
+                  EFFICIENCY SCORE
+                </div>
+                <div style={{ fontSize: 11, color: "#6B7280", lineHeight: 1.5 }}>
+                  {score.justification}
+                </div>
+              </div>
+            )}
+
+            {report.generated_at && (
+              <div style={{ fontSize: 10, color: "#9CA3AF", marginTop: 12 }}>
+                Generated: {new Date(report.generated_at).toLocaleTimeString("en-IN")}
+              </div>
+            )}
+          </>
+        )}
+      </div>
     </div>
-  </div>
-);
+  );
+};
+
+const cardStyle: React.CSSProperties = {
+  background: "#fff",
+  borderRadius: 16,
+  border: "1px solid #EEF0F7",
+  boxShadow: "0 1px 4px rgba(0,0,0,0.04)",
+  display: "flex",
+  flexDirection: "column",
+  height: "100%",
+  overflow: "hidden",
+};
+
+const headerStyle: React.CSSProperties = {
+  padding: "12px 18px",
+  borderBottom: "1px solid #EEF0F7",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "space-between",
+  flexShrink: 0,
+};

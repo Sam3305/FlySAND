@@ -1,117 +1,113 @@
-import { useReducer, useEffect, useRef, useCallback, useState } from "react";
-import throttle from "lodash/throttle";
-import type { LiveFlightState, WsEvent } from "../types";
-import { SEED_FLIGHTS, WS_CONFIG } from "../constants";
-import { flightReducer } from "../store/flightReducer";
-
 /**
  * useLiveFlightData
- * ─────────────────
- * Simulates a FastAPI WebSocket producing two event types:
- *   • PRICE_UPDATE — fired at ~2/s normally, ~30/s during Autobooking Swarm
- *   • SEAT_SOLD    — fired exclusively during swarm bursts
- *
- * Batching strategy:
- *   Incoming events are pushed to `pendingUpdates` (a ref — no re-render).
- *   `throttledFlush` (lodash throttle, trailing=true, 500ms) drains the
- *   buffer into a single `dispatch({ type: "BATCH", payload })` call.
- *   Result: React sees AT MOST 2 re-renders/sec regardless of event velocity.
- *
- * In production: replace the setInterval simulation with a real WebSocket:
- *   const ws = new WebSocket(WS_ENDPOINT);
- *   ws.onmessage = (e) => enqueue(JSON.parse(e.data));
+ * Connects to the real FastAPI WebSocket at /ws/live-ops.
+ * Receives real SEAT_SOLD and PRICE_UPDATE events from Redis.
+ * Polls /api/v1/dashboard/stats every 30s for aggregate KPIs.
  */
-export function useLiveFlightData(): LiveFlightState {
-  const [flights, dispatch] = useReducer(flightReducer, SEED_FLIGHTS);
-  const [connected,   setConnected]   = useState(false);
-  const [eventCount,  setEventCount]  = useState(0);
-  const [swarmActive, setSwarmActive] = useState(false);
-  const [batchSize,   setBatchSize]   = useState(0);
+import { useEffect, useRef, useState, useCallback } from "react";
+import type { WsEvent, DashboardStats } from "../types";
+import { WS_URL, API_BASE } from "../constants";
 
-  // Mutable buffer — never triggers renders by itself
-  const pendingUpdates = useRef<WsEvent[]>([]);
-  const evtCountRef    = useRef(0);
+export interface LiveOpsState {
+  connected:   boolean;
+  eventCount:  number;
+  events:      WsEvent[];         // last 100 events
+  stats:       DashboardStats | null;
+  statsLoading: boolean;
+}
 
-  // Keep dispatch ref stable across renders (avoids stale closures in callbacks)
-  const dispatchRef = useRef(dispatch);
-  dispatchRef.current = dispatch;
+const MAX_EVENTS = 100;
 
-  // ── Throttled flush ────────────────────────────────────────────────────────
-  // Created once via useRef so the throttle timer is never reset.
-  const throttledFlush = useRef(
-    throttle(
-      () => {
-        const batch = pendingUpdates.current.splice(0); // drain atomically
-        if (!batch.length) return;
-        setBatchSize(batch.length);
-        dispatchRef.current({ type: "BATCH", payload: batch });
-      },
-      WS_CONFIG.THROTTLE_MS,
-      { leading: false, trailing: true }
-    )
-  ).current;
+export function useLiveFlightData(): LiveOpsState {
+  const [connected,    setConnected]    = useState(false);
+  const [eventCount,   setEventCount]   = useState(0);
+  const [events,       setEvents]       = useState<WsEvent[]>([]);
+  const [stats,        setStats]        = useState<DashboardStats | null>(null);
+  const [statsLoading, setStatsLoading] = useState(true);
 
-  // ── Enqueue helper ─────────────────────────────────────────────────────────
-  const enqueue = useCallback(
-    (event: WsEvent) => {
-      pendingUpdates.current.push(event);
-      evtCountRef.current += 1;
-      setEventCount(evtCountRef.current);
-      throttledFlush(); // idempotent — lodash handles de-duplication internally
-    },
-    [throttledFlush]
-  );
+  const wsRef      = useRef<WebSocket | null>(null);
+  const countRef   = useRef(0);
+  const reconnectT = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // ── Simulated WS feed ──────────────────────────────────────────────────────
+  // ── Stats polling ────────────────────────────────────────────────────────
+  const fetchStats = useCallback(async () => {
+    try {
+      const res = await fetch(`${API_BASE}/api/v1/dashboard/stats`);
+      if (res.ok) {
+        const data = await res.json();
+        setStats(data);
+      }
+    } catch {
+      // backend not ready yet — ignore
+    } finally {
+      setStatsLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
-    setConnected(true);
+    fetchStats();
+    const t = setInterval(fetchStats, 30_000);
+    return () => clearInterval(t);
+  }, [fetchStats]);
 
-    const pickFlight = () =>
-      SEED_FLIGHTS[Math.floor(Math.random() * SEED_FLIGHTS.length)];
+  // ── WebSocket ─────────────────────────────────────────────────────────────
+  const connect = useCallback(() => {
+    if (wsRef.current?.readyState === WebSocket.OPEN) return;
 
-    // Normal cadence: random price drift every ~480ms
-    const normalTimer = setInterval(() => {
-      const f = pickFlight();
-      enqueue({
-        type:  "PRICE_UPDATE",
-        fid:   f.id,
-        delta: Math.round((Math.random() - 0.46) * WS_CONFIG.NORMAL_DELTA),
-      });
-    }, WS_CONFIG.NORMAL_INTERVAL);
+    const ws = new WebSocket(WS_URL);
+    wsRef.current = ws;
 
-    // Swarm: activates every 18s, fires ~30 evt/s for 4s
-    const swarmCycleTimer = setInterval(() => {
-      setSwarmActive(true);
-      let count = 0;
-
-      const burst = setInterval(() => {
-        const f = pickFlight();
-
-        enqueue({
-          type:  "PRICE_UPDATE",
-          fid:   f.id,
-          delta: Math.round((Math.random() - 0.28) * WS_CONFIG.SWARM_DELTA),
-        });
-        enqueue({
-          type:  "SEAT_SOLD",
-          fid:   f.id,
-          count: Math.ceil(Math.random() * 3),
-        });
-
-        if (++count >= WS_CONFIG.SWARM_EVENT_COUNT) {
-          clearInterval(burst);
-          setSwarmActive(false);
-        }
-      }, WS_CONFIG.SWARM_INTERVAL_MS);
-    }, WS_CONFIG.SWARM_CYCLE_MS);
-
-    return () => {
-      clearInterval(normalTimer);
-      clearInterval(swarmCycleTimer);
-      throttledFlush.cancel(); // flush any queued batch on unmount
-      setConnected(false);
+    ws.onopen = () => {
+      setConnected(true);
     };
-  }, [enqueue, throttledFlush]);
 
-  return { flights, connected, eventCount, swarmActive, batchSize };
+    ws.onmessage = (e) => {
+      try {
+        const evt: WsEvent = JSON.parse(e.data);
+        if ((evt as any).type === "keepalive" || (evt as any).type === "pong") return;
+        if (evt.event_type === "CONNECTED") return;
+
+        countRef.current += 1;
+        setEventCount(countRef.current);
+        setEvents((prev) => [evt, ...prev].slice(0, MAX_EVENTS));
+
+        // Refresh stats after a SEAT_SOLD so numbers stay current
+        if (evt.event_type === "SEAT_SOLD") {
+          setTimeout(fetchStats, 500);
+        }
+      } catch {
+        // non-JSON keepalive frame — ignore
+      }
+    };
+
+    ws.onerror = () => {
+      ws.close();
+    };
+
+    ws.onclose = () => {
+      setConnected(false);
+      wsRef.current = null;
+      // Reconnect after 3s
+      reconnectT.current = setTimeout(connect, 3_000);
+    };
+
+    // Ping every 20s to keep alive
+    const pingT = setInterval(() => {
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: "ping" }));
+      }
+    }, 20_000);
+
+    return () => clearInterval(pingT);
+  }, [fetchStats]);
+
+  useEffect(() => {
+    connect();
+    return () => {
+      if (reconnectT.current) clearTimeout(reconnectT.current);
+      wsRef.current?.close();
+    };
+  }, [connect]);
+
+  return { connected, eventCount, events, stats, statsLoading };
 }

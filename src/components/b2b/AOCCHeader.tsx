@@ -1,91 +1,82 @@
 import React from "react";
-import { T } from "../../constants";
 import { useNavStore, useAuthStore } from "../../store";
-import { useClock } from "../../hooks";
-import { WsStatusBadge } from "../shared/WsStatusBadge";
-import type { LiveFlightState } from "../../types";
+import { LogOut } from "lucide-react";
+import flysandLogo from "../../assets/flysand_logo.png";
 
-interface Props {
-  live: LiveFlightState;
-}
-
-export const AOCCHeader: React.FC<Props> = ({ live }) => {
+export const AOCCHeader: React.FC = () => {
   const setView    = useNavStore((s) => s.setView);
   const logout     = useAuthStore((s) => s.logout);
   const operatorId = useAuthStore((s) => s.operatorId);
-  const now        = useClock();
-
-  const handleLogout = () => {
-    logout();
-    setView("b2c");
-  };
 
   return (
     <div style={{
-      background: "#040404",
-      borderBottom: `1px solid ${T.border}`,
+      background: "linear-gradient(135deg, #0F3CC9 0%, #1E40AF 50%, #0B2A8A 100%)",
       display: "flex",
       alignItems: "center",
       justifyContent: "space-between",
-      padding: "0 14px",
-      height: 40,
+      padding: "0 24px",
+      height: 54,
       flexShrink: 0,
     }}>
-      {/* ── Left cluster ── */}
-      <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-        <span style={{ fontSize: 11, fontWeight: 700, color: T.green, letterSpacing: "0.08em" }}>
-          ▶ AOCC
+      {/* Left */}
+      <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+        <img src={flysandLogo} alt="FlySAND" style={{ width: 32, height: 32, borderRadius: 8, objectFit: "cover" }} />
+        <span style={{ fontSize: 15, fontWeight: 800, color: "#fff", letterSpacing: "0.04em" }}>
+          FlySAND
         </span>
-        <span style={{ color: T.border }}>|</span>
-        <span style={{ fontSize: 10, color: T.amber, letterSpacing: "0.1em" }}>INDIGO OPS 6E</span>
-        <span style={{ color: T.border }}>|</span>
-
-        <WsStatusBadge
-          connected={live.connected}
-          eventCount={live.eventCount}
-          swarmActive={live.swarmActive}
-          variant="b2b"
-        />
+        <span style={{
+          fontSize: 9, fontWeight: 700, color: "#fff",
+          background: "rgba(255,255,255,0.15)",
+          padding: "3px 8px", borderRadius: 4,
+          letterSpacing: "0.08em",
+        }}>
+          CFO DASHBOARD
+        </span>
       </div>
 
-      {/* ── Right cluster ── */}
+      {/* Right */}
       <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-        <span style={{ fontSize: 10, color: T.textDm }}>
-          EVT:<span style={{ color: T.cyan }}> {live.eventCount.toLocaleString()}</span>
-        </span>
-        <span style={{ fontSize: 10, color: T.textDm }}>
-          BATCH:<span style={{ color: live.swarmActive ? T.amber : T.green }}> {live.batchSize}</span>
-        </span>
-        <span style={{ fontSize: 10, color: T.textDm }}>
-          THROTTLE:<span style={{ color: T.purple }}> 500ms</span>
-        </span>
-        <span style={{ color: T.border }}>|</span>
-        <span style={{ fontSize: 11, color: T.textBt, fontVariantNumeric: "tabular-nums" }}>
-          {now.toLocaleTimeString("en-IN", { hour12: false })} IST
-        </span>
-        <span style={{ color: T.border }}>|</span>
-        <span style={{ fontSize: 9, color: T.textDm }}>
-          OP: <span style={{ color: T.cyan }}>{operatorId}</span>
-        </span>
+        {operatorId && (
+          <span style={{ fontSize: 12, color: "rgba(255,255,255,0.7)" }}>
+            {operatorId}
+          </span>
+        )}
         <button
           onClick={() => setView("b2c")}
           style={{
-            fontSize: 9, color: T.textDm, background: "none",
-            border: `1px solid ${T.borderBt}`, padding: "3px 8px",
-            cursor: "pointer", fontFamily: "'JetBrains Mono', monospace",
+            fontSize: 11, color: "rgba(255,255,255,0.8)",
+            background: "rgba(255,255,255,0.1)",
+            border: "1px solid rgba(255,255,255,0.2)",
+            padding: "6px 14px", borderRadius: 6,
+            cursor: "pointer", fontFamily: "inherit",
           }}
         >
-          → B2C
+          B2C PORTAL
         </button>
         <button
-          onClick={handleLogout}
+          onClick={() => setView("ops-login")}
           style={{
-            fontSize: 9, color: T.red, background: "none",
-            border: `1px solid ${T.red}30`, padding: "3px 8px",
-            cursor: "pointer", fontFamily: "'JetBrains Mono', monospace",
+            fontSize: 11, color: "rgba(255,255,255,0.8)",
+            background: "rgba(255,255,255,0.1)",
+            border: "1px solid rgba(255,255,255,0.2)",
+            padding: "6px 14px", borderRadius: 6,
+            cursor: "pointer", fontFamily: "inherit",
           }}
         >
-          LOGOUT
+          OPS PORTAL
+        </button>
+        <button
+          onClick={() => { logout(); setView("b2c"); }}
+          style={{
+            fontSize: 11, color: "#FCA5A5",
+            background: "rgba(239,68,68,0.15)",
+            border: "1px solid rgba(239,68,68,0.3)",
+            padding: "6px 12px", borderRadius: 6,
+            cursor: "pointer", fontFamily: "inherit",
+            display: "flex", alignItems: "center", gap: 4,
+          }}
+        >
+          <LogOut size={12} /> LOGOUT
         </button>
       </div>
     </div>

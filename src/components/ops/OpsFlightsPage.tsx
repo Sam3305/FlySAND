@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useCallback } from "react";
 import {
-  LogOut, RefreshCw, Plane, TrendingUp,
-  ArrowUpDown, AlertCircle, Loader,
+  LogOut, RefreshCw, TrendingUp,
+  ArrowUpDown, AlertCircle, Loader, ChevronLeft, ChevronRight,
 } from "lucide-react";
 import { useNavStore } from "../../store/navStore";
 import { AIRPORTS }   from "../../constants";
 import { formatINR }  from "../../utils";
 import type { AirportCode } from "../../types";
+import flysandLogo from "../../assets/flysand_logo.png";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -93,6 +94,10 @@ export const OpsFlightsPage: React.FC = () => {
   const [sortKey,  setSortKey]  = useState<SortKey>("departure_date");
   const [sortAsc,  setSortAsc]  = useState(true);
 
+  // Pagination
+  const [perPage, setPerPage] = useState(25);
+  const [page,    setPage]    = useState(1);
+
   const fetchAll = useCallback(async () => {
     setLoading(true);
     setError("");
@@ -173,38 +178,47 @@ export const OpsFlightsPage: React.FC = () => {
 
       {/* ── Header ── */}
       <div style={{
-        background: "linear-gradient(145deg,#0F3CC9,#1246e0)",
+        background: "#0A1628",
         padding: "0 24px", height: 56,
         display: "flex", alignItems: "center", justifyContent: "space-between",
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <div style={{
-            width: 32, height: 32, borderRadius: "50%",
-            background: "#FF6B00",
-            display: "flex", alignItems: "center", justifyContent: "center",
-          }}>
-            <Plane size={15} color="#fff" />
-          </div>
-          <span style={{ color: "#fff", fontWeight: 800, fontSize: 18 }}>IndiGo</span>
+          <img src={flysandLogo} alt="FlySAND" style={{ width: 32, height: 32, borderRadius: "50%", objectFit: "cover" }} />
+          <span style={{ color: "#fff", fontWeight: 800, fontSize: 18 }}>FlySAND</span>
           <span style={{
-            fontSize: 11, color: "rgba(255,255,255,0.5)",
-            borderLeft: "1px solid rgba(255,255,255,0.2)",
-            paddingLeft: 12, marginLeft: 4,
+            fontSize: 9, color: "#00E5FF", fontFamily: "monospace",
+            background: "rgba(0,229,255,0.08)", padding: "2px 7px",
+            borderRadius: 2, letterSpacing: "0.1em", marginLeft: 2,
           }}>
-            Ops Analytics
+            OPS ANALYTICS
           </span>
         </div>
-        <button
-          onClick={() => setView("b2c")}
-          style={{
-            display: "flex", alignItems: "center", gap: 6,
-            background: "rgba(255,255,255,0.12)", border: "none",
-            borderRadius: 8, padding: "7px 14px",
-            color: "#fff", fontSize: 12, cursor: "pointer",
-          }}
-        >
-          <LogOut size={13} /> Sign out
-        </button>
+        <div style={{ display: "flex", gap: 10 }}>
+          <button
+            onClick={() => setView("ops-agents")}
+            style={{
+              display: "flex", alignItems: "center", gap: 6,
+              background: "rgba(0,229,255,0.1)", border: "1px solid rgba(0,229,255,0.2)",
+              borderRadius: 6, padding: "6px 14px", fontWeight: 600,
+              color: "#00E5FF", fontSize: 12, cursor: "pointer",
+              letterSpacing: "0.03em",
+            }}
+          >
+            AI Ensemble
+          </button>
+          <button
+            onClick={() => setView("b2c")}
+            style={{
+              display: "flex", alignItems: "center", gap: 6,
+              background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)",
+              borderRadius: 6, padding: "6px 12px",
+              color: "rgba(255,255,255,0.6)", fontSize: 11, cursor: "pointer",
+              letterSpacing: "0.06em",
+            }}
+          >
+            <LogOut size={12} /> EXIT
+          </button>
+        </div>
       </div>
 
       <div style={{ maxWidth: 1300, margin: "0 auto", padding: "24px 20px 60px" }}>
@@ -286,6 +300,65 @@ export const OpsFlightsPage: React.FC = () => {
             </div>
           </div>
 
+          {/* ── Pagination ── */}
+          {!loading && !error && filtered.length > 0 && (
+            <div style={{
+              padding: "10px 20px", borderBottom: "1px solid #EEF0F7",
+              display: "flex", justifyContent: "space-between", alignItems: "center",
+              background: "#FAFBFC",
+            }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <span style={{ fontSize: 12, color: "#6B7280" }}>Show</span>
+                <select
+                  value={perPage}
+                  onChange={(e) => { setPerPage(Number(e.target.value)); setPage(1); }}
+                  style={{
+                    border: "1.5px solid #E5E7EB", borderRadius: 6,
+                    padding: "5px 8px", fontSize: 12, color: "#1A1A2E",
+                    background: "#fff", outline: "none", fontFamily: "Barlow, sans-serif",
+                  }}
+                >
+                  {[10, 25, 50, 100, 250].map(n => (
+                    <option key={n} value={n}>{n}</option>
+                  ))}
+                </select>
+                <span style={{ fontSize: 12, color: "#6B7280" }}>per page</span>
+              </div>
+
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <span style={{ fontSize: 12, color: "#6B7280", marginRight: 8 }}>
+                  {Math.min((page - 1) * perPage + 1, filtered.length)}–{Math.min(page * perPage, filtered.length)} of {filtered.length}
+                </span>
+                <button
+                  disabled={page <= 1}
+                  onClick={() => setPage(p => Math.max(1, p - 1))}
+                  style={{
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    width: 30, height: 30, borderRadius: 6,
+                    background: page <= 1 ? "#F3F4F6" : "#EEF2FF",
+                    border: "none", cursor: page <= 1 ? "default" : "pointer",
+                    color: page <= 1 ? "#D1D5DB" : "#0F3CC9",
+                  }}
+                >
+                  <ChevronLeft size={14} />
+                </button>
+                <button
+                  disabled={page * perPage >= filtered.length}
+                  onClick={() => setPage(p => p + 1)}
+                  style={{
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    width: 30, height: 30, borderRadius: 6,
+                    background: page * perPage >= filtered.length ? "#F3F4F6" : "#EEF2FF",
+                    border: "none", cursor: page * perPage >= filtered.length ? "default" : "pointer",
+                    color: page * perPage >= filtered.length ? "#D1D5DB" : "#0F3CC9",
+                  }}
+                >
+                  <ChevronRight size={14} />
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* Loading */}
           {loading && (
             <div style={{ textAlign: "center", padding: 60, color: "#6B7280" }}>
@@ -366,7 +439,7 @@ export const OpsFlightsPage: React.FC = () => {
                       </td>
                     </tr>
                   )}
-                  {filtered.map((r) => {
+                  {filtered.slice((page - 1) * perPage, page * perPage).map((r) => {
                     const st = STATUS_STYLE[r.status] ?? STATUS_STYLE["scheduled"];
                     return (
                       <tr
@@ -477,6 +550,7 @@ export const OpsFlightsPage: React.FC = () => {
               </table>
             </div>
           )}
+
         </div>
 
         {/* Profit margin indicator */}

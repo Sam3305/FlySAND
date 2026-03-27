@@ -56,7 +56,7 @@ export const FlightCard: React.FC<Props> = ({ flight, passengerCount = 1 }) => {
               { code: flight.from, time: flight.dep },
               null,
               { code: flight.to,   time: flight.arr },
-            ].map((item, i) =>
+            ].map((item, _i) =>
               item === null ? (
                 <div key="mid" style={{ textAlign: "center" }}>
                   <div style={{ fontSize: 11, color: "#9CA3AF", fontFamily: "'JetBrains Mono',monospace" }}>{duration}</div>

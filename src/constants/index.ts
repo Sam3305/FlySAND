@@ -1,5 +1,9 @@
 import type { Airport, AirportCode, Flight } from "../types";
 
+// ─── Backend URLs ─────────────────────────────────────────────────────────────
+export const API_BASE = "http://localhost:8000";
+export const WS_URL   = "ws://localhost:8000/ws/live-ops";
+
 // ─── Network Scope ────────────────────────────────────────────────────────────
 export const AIRPORTS: Record<AirportCode, Airport> = {
   DEL: { city: "Delhi",   name: "Indira Gandhi Intl",          terminal: "T2" },

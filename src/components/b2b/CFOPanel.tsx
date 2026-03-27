@@ -1,0 +1,156 @@
+import React, { useEffect, useState } from "react";
+import { API_BASE } from "../../constants";
+import type { FinanceReport } from "../../types";
+import { DollarSign, AlertTriangle, Star, ChevronRight } from "lucide-react";
+
+export const CFOPanel: React.FC = () => {
+  const [report,  setReport]  = useState<FinanceReport | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetch_ = async () => {
+      try {
+        const res  = await fetch(`${API_BASE}/api/v1/reports/finance`);
+        const data = await res.json();
+        setReport(data);
+      } catch { /* backend not ready */ }
+      finally { setLoading(false); }
+    };
+    fetch_();
+    const t = setInterval(fetch_, 60_000);
+    return () => clearInterval(t);
+  }, []);
+
+  const fmt = (n: number) =>
+    n >= 1_00_00_000 ? `₹${(n / 1_00_00_000).toFixed(1)}Cr`
+    : n >= 1_00_000  ? `₹${(n / 1_00_000).toFixed(1)}L`
+    : `₹${n.toLocaleString("en-IN")}`;
+
+  const healthColor = report?.overall_health === "HEALTHY" ? "#059669" : report?.overall_health === "CAUTION" ? "#D97706" : report?.overall_health === "CRITICAL" ? "#DC2626" : "#6B7280";
+
+  return (
+    <div style={cardStyle}>
+      {/* Header */}
+      <div style={headerStyle}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <DollarSign size={16} color="#0F3CC9" />
+          <span style={{ fontWeight: 700, fontSize: 13, color: "#1A1A2E" }}>Finance Report</span>
+        </div>
+        {report?.overall_health && (
+          <span style={{
+            fontSize: 10, fontWeight: 700, color: healthColor,
+            background: `${healthColor}14`, padding: "3px 8px", borderRadius: 6,
+          }}>
+            {report.overall_health}
+          </span>
+        )}
+      </div>
+
+      <div style={{ padding: "14px 18px", overflowY: "auto", flex: 1 }}>
+        {loading && (
+          <p style={{ fontSize: 12, color: "#9CA3AF" }}>Loading…</p>
+        )}
+
+        {!loading && (!report || !report.available) && (
+          <div style={{ fontSize: 12, color: "#9CA3AF", lineHeight: 1.8, textAlign: "center", padding: "24px 0" }}>
+            <DollarSign size={28} style={{ opacity: 0.15, marginBottom: 8 }} />
+            <p>No finance report yet.</p>
+            <code style={{ fontSize: 10, color: "#0F3CC9", background: "#EEF2FF", padding: "4px 10px", borderRadius: 6, display: "inline-block", marginTop: 6 }}>
+              python -m agents.finance_controller
+            </code>
+          </div>
+        )}
+
+        {report?.available && (
+          <>
+            {/* Executive summary */}
+            {report.executive_summary && (
+              <p style={{ fontSize: 12, color: "#374151", lineHeight: 1.7, marginBottom: 14 }}>
+                {report.executive_summary}
+              </p>
+            )}
+
+            {/* Revenue leakage */}
+            {report.revenue_leakage && report.revenue_leakage.estimated_inr > 0 && (
+              <div style={{
+                background: "#FEF2F2", borderRadius: 10, padding: "10px 14px", marginBottom: 12,
+                borderLeft: "3px solid #DC2626",
+              }}>
+                <div style={{ fontSize: 10, color: "#DC2626", fontWeight: 700, marginBottom: 3, display: "flex", alignItems: "center", gap: 4 }}>
+                  <AlertTriangle size={12} />
+                  REVENUE LEAKAGE: {fmt(report.revenue_leakage.estimated_inr)}
+                </div>
+                <div style={{ fontSize: 11, color: "#6B7280", lineHeight: 1.5 }}>
+                  {report.revenue_leakage.explanation}
+                </div>
+              </div>
+            )}
+
+            {/* Route ranking */}
+            {report.route_ranking && (
+              <div style={{ marginBottom: 12 }}>
+                <div style={{ fontSize: 10, fontWeight: 700, color: "#6B7280", letterSpacing: "0.08em", marginBottom: 6 }}>
+                  ROUTE RANKING
+                </div>
+                {report.route_ranking.star?.length > 0 && (
+                  <div style={{ fontSize: 11, marginBottom: 4, display: "flex", alignItems: "center", gap: 4 }}>
+                    <Star size={12} color="#059669" />
+                    <span style={{ color: "#059669", fontWeight: 600 }}>{report.route_ranking.star.join("  ")}</span>
+                  </div>
+                )}
+                {report.route_ranking.problem?.length > 0 && (
+                  <div style={{ fontSize: 11, display: "flex", alignItems: "center", gap: 4 }}>
+                    <AlertTriangle size={12} color="#DC2626" />
+                    <span style={{ color: "#DC2626" }}>{report.route_ranking.problem.join("  ")}</span>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Top recommendation */}
+            {report.recommendations?.[0] && (
+              <div style={{
+                background: "#EEF2FF", borderRadius: 10, padding: "10px 14px",
+                borderLeft: "3px solid #0F3CC9",
+              }}>
+                <div style={{ fontSize: 10, fontWeight: 700, color: "#6B7280", letterSpacing: "0.08em", marginBottom: 3 }}>
+                  TOP ACTION
+                </div>
+                <div style={{ fontSize: 11, color: "#0F3CC9", lineHeight: 1.5, display: "flex", alignItems: "flex-start", gap: 4 }}>
+                  <ChevronRight size={12} style={{ marginTop: 2, flexShrink: 0 }} />
+                  {report.recommendations[0].action}
+                </div>
+              </div>
+            )}
+
+            {report.generated_at && (
+              <div style={{ fontSize: 10, color: "#9CA3AF", marginTop: 12 }}>
+                Generated: {new Date(report.generated_at).toLocaleTimeString("en-IN")}
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  );
+};
+
+const cardStyle: React.CSSProperties = {
+  background: "#fff",
+  borderRadius: 16,
+  border: "1px solid #EEF0F7",
+  boxShadow: "0 1px 4px rgba(0,0,0,0.04)",
+  display: "flex",
+  flexDirection: "column",
+  height: "100%",
+  overflow: "hidden",
+};
+
+const headerStyle: React.CSSProperties = {
+  padding: "12px 18px",
+  borderBottom: "1px solid #EEF0F7",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "space-between",
+  flexShrink: 0,
+};

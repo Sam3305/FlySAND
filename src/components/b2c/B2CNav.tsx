@@ -1,65 +1,49 @@
 import React from "react";
-import { Plane, BarChart3 } from "lucide-react";
 import { useNavStore } from "../../store";
+import flysandLogo from "../../assets/flysand_logo.png";
 
 export const B2CNav: React.FC = () => {
   const setView = useNavStore((s) => s.setView);
 
   return (
-    <nav style={{ background: "#0F3CC9", position: "sticky", top: 0, zIndex: 50 }}>
+    <nav style={{ background: "#0A1628", position: "sticky", top: 0, zIndex: 50 }}>
       <div style={{
         maxWidth: 1100, margin: "0 auto", padding: "0 20px",
         height: 56, display: "flex", alignItems: "center", justifyContent: "space-between",
       }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 32 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <div style={{
-              width: 32, height: 32, borderRadius: "50%",
-              background: "#FF6B00", display: "flex", alignItems: "center", justifyContent: "center",
-            }}>
-              <Plane size={15} color="#fff" />
-            </div>
-            <span style={{ color: "#fff", fontWeight: 800, fontSize: 20, letterSpacing: "-0.3px" }}>
-              IndiGo
-            </span>
-          </div>
-          {["Book", "Manage", "Check-In", "Offers"].map((t) => (
-            <button key={t} style={{
-              color: "rgba(255,255,255,0.7)", background: "none", border: "none",
-              cursor: "pointer", fontSize: 14, fontWeight: 500, fontFamily: "Barlow, sans-serif",
-            }}>
-              {t}
-            </button>
-          ))}
+        {/* Brand */}
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <img src={flysandLogo} alt="FlySAND" style={{ width: 32, height: 32, borderRadius: "50%", objectFit: "cover" }} />
+          <span style={{
+            color: "#fff", fontWeight: 800, fontSize: 18,
+            letterSpacing: "-0.2px", fontFamily: "system-ui, sans-serif",
+          }}>
+            FlySAND
+          </span>
+          <span style={{
+            fontSize: 9, color: "#00E5FF", fontFamily: "monospace",
+            background: "rgba(0,229,255,0.08)", padding: "2px 7px",
+            borderRadius: 2, letterSpacing: "0.1em", marginLeft: 2,
+          }}>
+            AI OPERATED
+          </span>
         </div>
 
+        {/* Right side */}
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          {/* Ops Analytics link */}
-          <button
-            onClick={() => setView("ops-login")}
-            style={{
-              display: "flex", alignItems: "center", gap: 6,
-              fontSize: 12, fontFamily: "Barlow, sans-serif",
-              color: "rgba(255,255,255,0.8)",
-              background: "rgba(255,255,255,0.10)",
-              border: "1px solid rgba(255,255,255,0.18)",
-              padding: "6px 13px", cursor: "pointer", borderRadius: 6,
-            }}
-          >
-            <BarChart3 size={13} /> Ops
-          </button>
-
-          {/* AOCC terminal link */}
           <button
             onClick={() => setView("login")}
             style={{
               fontSize: 11, fontFamily: "'JetBrains Mono', monospace",
-              color: "rgba(255,255,255,0.7)", background: "rgba(255,255,255,0.08)",
-              border: "1px solid rgba(255,255,255,0.2)", padding: "6px 12px",
+              color: "rgba(255,255,255,0.6)",
+              background: "rgba(255,255,255,0.05)",
+              border: "1px solid rgba(255,255,255,0.12)",
+              padding: "6px 14px",
               cursor: "pointer", borderRadius: 4,
+              letterSpacing: "0.06em",
             }}
           >
-            → AOCC TERMINAL
+            CREW LOGIN
           </button>
         </div>
       </div>
