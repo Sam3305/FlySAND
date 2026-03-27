@@ -38,7 +38,7 @@ class AircraftDataService:
             specs = {
                 "model": model_name,
                 "icao_code": icao_code,
-                "max_passengers": aircraft_data.get('pax', limits.get('pax', self.indigo_pax.get(icao_code))),
+                "max_passengers": self.indigo_pax.get(icao_code, aircraft_data.get('pax', limits.get('pax'))),
                 "operating_empty_weight_kg": aircraft_data.get('oew', limits.get('oew')),
                 "max_takeoff_weight_kg": aircraft_data.get('mtow', limits.get('mtow')),
                 "cruise_mach": cruise.get('mach', 0.78),

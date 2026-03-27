@@ -12,7 +12,7 @@ _REPO_ROOT    = Path(__file__).resolve().parent.parent.parent.parent
 _MODEL_PATH   = _REPO_ROOT / "ml_pricing" / "artifacts" / "xgb_indigo_pricing.ubj"
 _SCALER_PATH  = _REPO_ROOT / "ml_pricing" / "artifacts" / "feature_scaler.pkl"
 _FEAT_PATH    = _REPO_ROOT / "ml_pricing" / "artifacts" / "feature_names.json"
-MARGIN_FLOOR  = 1.15
+MARGIN_FLOOR  = 1.02
 
 _model = _scaler = _meta = None
 _loaded = _tried = False
@@ -60,20 +60,41 @@ def _vec(floor_price, seats_available, total_seats, severity, days_to_flight, fl
     row[0,:len(_NUMERIC)] = _scaler.transform(row[:,:len(_NUMERIC)])[0]
     return row
 
-def predict_price(*, flight_id, floor_price, seats_available, total_seats, severity, days_to_flight=15):
+def predict_price(
+    *,
+    flight_id:       str,
+    floor_price:     float,
+    seats_available: int,
+    total_seats:     int,
+    severity:        float,
+    days_to_flight:  int   = 15,
+    current_price:   float = 0.0,
+) -> float:
+    """
+    Apply a weather disruption premium to the current seeded price.
+
+    The seeder already priced flights correctly via the calibrated
+    economics engine (floor x DOW multiplier). This function adds
+    a WEATHER PREMIUM on top — it does NOT reprice from scratch.
+
+    Premium caps: severity=0.5 -> ~10%, severity=1.0 -> ~25% max.
+    """
+    base = current_price if current_price > floor_price else floor_price
+    lf   = max(0.0, min(1.0, 1.0 - seats_available / max(total_seats, 1)))
+
     if _load():
         try:
-            v     = _vec(floor_price, seats_available, total_seats, severity, days_to_flight, flight_id)
-            ratio = float(np.expm1(_model.predict(v)[0]))  # model output = price/floor ratio
-            price = ratio * floor_price                     # convert to INR
-            final = max(price, floor_price * MARGIN_FLOOR)
-            logger.debug("XGB flight=%s ratio=%.3f raw=₹%.0f final=₹%.0f", flight_id, ratio, price, final)
-            return round(final, 2)
+            v         = _vec(floor_price, seats_available, total_seats,
+                             severity, days_to_flight, flight_id)
+            ml_ratio  = float(np.expm1(_model.predict(v)[0]))
+            weather_p = min(max(0.0, ml_ratio - 1.0) * severity, 0.25)
+            logger.debug("XGB weather — flight=%s ml_ratio=%.3f sev=%.2f premium=+%.1f%%",
+                         flight_id, ml_ratio, severity, weather_p * 100)
         except Exception as e:
-            logger.warning("XGB inference error %s: %s", flight_id, e)
+            logger.warning("XGB inference error %s: %s — heuristic", flight_id, e)
+            weather_p = min(severity * 0.18 + lf * severity * 0.10, 0.25)
+    else:
+        weather_p = min(severity * 0.18 + lf * severity * 0.10, 0.25)
 
-    # heuristic fallback
-    if total_seats <= 0: return floor_price
-    lf  = max(0.0, min(1.0, 1.0 - seats_available/total_seats))
-    p   = floor_price * math.exp(1.40*lf) + floor_price*0.18*severity
-    return round(max(p, floor_price), 2)
+    final = max(base * (1.0 + weather_p), floor_price * MARGIN_FLOOR)
+    return round(final, 2)

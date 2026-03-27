@@ -47,8 +47,10 @@ from app.core.db import close_mongo, connect_mongo
 from app.tasks.game_loop import start_game_loop
 
 # Route modules
-from app.api.routes.booking import router as booking_router
-from app.api.routes.flights import router as flights_router
+from app.api.routes.booking  import router as booking_router
+from app.api.routes.flights  import router as flights_router
+from app.api.routes.dashboard import router as dashboard_router
+from app.api.routes.orchestrator import router as orchestrator_router
 from app.websockets.live_ops import ws_router
 
 logging.basicConfig(
@@ -143,8 +145,10 @@ app.add_middleware(
 # ---------------------------------------------------------------------------
 
 # REST endpoints under /api/v1
-app.include_router(booking_router, prefix="/api/v1", tags=["Booking"])
-app.include_router(flights_router, prefix="/api/v1", tags=["Flights"])
+app.include_router(booking_router,   prefix="/api/v1", tags=["Booking"])
+app.include_router(flights_router,   prefix="/api/v1", tags=["Flights"])
+app.include_router(dashboard_router, prefix="/api/v1", tags=["Dashboard"])
+app.include_router(orchestrator_router, prefix="/api/v1/orchestrator", tags=["Orchestrator"])
 
 # WebSocket endpoint — ws_router already defines the full path "/ws/live-ops"
 app.include_router(ws_router, tags=["Live Ops"])

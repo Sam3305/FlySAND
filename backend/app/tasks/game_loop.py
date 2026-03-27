@@ -57,9 +57,10 @@ async def _handle_weather_severe(event: dict) -> None:
                 logger.warning("Flight %r not found in DB — skipping repricing", flight_id)
                 continue
 
-            current_price: float = flight_doc.get("current_price_usd", 0.0)
-            seats_available: int = flight_doc.get("seats_available", 0)
-            total_seats: int = flight_doc.get("total_seats", 100)
+            current_price: float = (flight_doc.get("current_pricing") or {}).get("ml_fare_inr", 0.0)
+            floor_price:   float = (flight_doc.get("current_pricing") or {}).get("floor_inr", 0.0)
+            seats_available: int = (flight_doc.get("inventory") or {}).get("available", 0)
+            total_seats: int     = (flight_doc.get("inventory") or {}).get("capacity", 186)
 
             # ── Step 1: Economics engine → new floor price ────────────────
             new_floor = await asyncio.to_thread(
@@ -70,14 +71,18 @@ async def _handle_weather_severe(event: dict) -> None:
                 region=region,
             )
 
-            # ── Step 2: ML model → optimised price above the floor ────────
+            # ── Step 2: ML model → weather premium on top of current price ─
+            # IMPORTANT: current_price is the already-calibrated seeded price.
+            # predict_price adds a disruption premium (0-25%) on top of it.
+            # It does NOT reprice from scratch — that would give absurd prices.
             new_price = await asyncio.to_thread(
                 predict_price,
                 flight_id=flight_id,
-                floor_price=new_floor,
+                floor_price=max(new_floor, floor_price),
                 seats_available=seats_available,
                 total_seats=total_seats,
                 severity=weather_severity,
+                current_price=current_price,
             )
 
             # Enforce the floor as a hard lower bound
@@ -85,11 +90,11 @@ async def _handle_weather_severe(event: dict) -> None:
 
             # ── Step 3: Atomic MongoDB update ─────────────────────────────
             await collection.update_one(
-                {"flight_id": flight_id},
+                {"_id": flight_id},
                 {
                     "$set": {
-                        "current_price_usd": round(final_price, 2),
-                        "price_floor_usd": round(new_floor, 2),
+                        "current_pricing.ml_fare_inr": round(final_price, 2),
+                        "current_pricing.floor_inr":   round(new_floor, 2),
                         "last_repriced_by": "game_loop:WEATHER_SEVERE",
                     }
                 },

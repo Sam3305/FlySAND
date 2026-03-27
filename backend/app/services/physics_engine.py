@@ -20,7 +20,7 @@ class AeroPhysicsEngine:
             "A20N": 1989, "A21N": 2323, "A320": 2326, "AT72": 800   
         }
         self.verified_pax = {
-            "A20N": 186, "A21N": 192, "A320": 153, "AT72": 78
+            "A20N": 186, "A21N": 222, "A320": 180, "AT72": 78
         }
 
     def _load_json(self, filename):
