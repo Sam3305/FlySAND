@@ -1,0 +1,29 @@
+{
+  "model": "XGBoostRegressor",
+  "target": "log1p(price_inr)",
+  "train_rows": 34496,
+  "val_rows": 8624,
+  "gq_train_pct": 45.0,
+  "price_range_train": {
+    "min": 1538,
+    "max": 42783,
+    "mean": 6057,
+    "median": 5578
+  },
+  "metrics": {
+    "MAE_INR": 3043.03,
+    "RMSE_INR": 5080.79,
+    "MAPE_pct": 18.742,
+    "Ratio_MAE": 0.5882,
+    "Avg_predicted_ratio": 1.9689,
+    "Margin_Compliance_pct": 100.0,
+    "MAE_after_enforcer_INR": 3043.03,
+    "Best_Iteration": 418,
+    "Train_rows": 8624
+  },
+  "artifacts": {
+    "model": "ml_pricing\\artifacts\\xgb_indigo_pricing.ubj",
+    "scaler": "ml_pricing\\artifacts\\feature_scaler.pkl",
+    "features": "ml_pricing\\artifacts\\feature_names.json"
+  }
+}

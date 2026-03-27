@@ -1,0 +1,138 @@
+import React, { useEffect, useState } from "react";
+import { API_BASE } from "../../constants";
+import type { CfoBriefing } from "../../types";
+import { FileText, TrendingUp, Map, Shield, Lightbulb, Loader } from "lucide-react";
+
+export const DailyBriefing: React.FC = () => {
+  const [briefing, setBriefing] = useState<CfoBriefing | null>(null);
+  const [loading,  setLoading]  = useState(true);
+
+  useEffect(() => {
+    const fetch_ = async () => {
+      try {
+        const res  = await fetch(`${API_BASE}/api/v1/reports/cfo-briefing`);
+        const data = await res.json();
+        setBriefing(data);
+      } catch { /* backend not ready */ }
+      finally { setLoading(false); }
+    };
+    fetch_();
+    const t = setInterval(fetch_, 60_000);
+    return () => clearInterval(t);
+  }, []);
+
+  if (loading) {
+    return (
+      <div style={cardStyle}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, padding: 40, justifyContent: "center", color: "#9CA3AF" }}>
+          <Loader size={18} style={{ animation: "spin 1s linear infinite" }} />
+          <span style={{ fontSize: 13 }}>Loading briefing…</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (!briefing || !briefing.available) {
+    return (
+      <div style={cardStyle}>
+        <div style={headerStyle}>
+          <FileText size={18} color="#0F3CC9" />
+          <span style={{ fontWeight: 700, fontSize: 15, color: "#1A1A2E" }}>Daily Executive Briefing</span>
+        </div>
+        <div style={{ padding: "32px 24px", textAlign: "center", color: "#9CA3AF" }}>
+          <FileText size={36} style={{ opacity: 0.2, marginBottom: 12 }} />
+          <p style={{ fontSize: 14, marginBottom: 8 }}>No briefing available yet.</p>
+          <p style={{ fontSize: 12 }}>Run the CFO Narrator agent:</p>
+          <code style={{ fontSize: 11, color: "#0F3CC9", background: "#EEF2FF", padding: "6px 12px", borderRadius: 6, display: "inline-block", marginTop: 8 }}>
+            python -m agents.cfo_narrator
+          </code>
+        </div>
+      </div>
+    );
+  }
+
+  const healthColor = briefing.overall_health === "HEALTHY" ? "#059669" : briefing.overall_health === "CAUTION" ? "#D97706" : briefing.overall_health === "CRITICAL" ? "#DC2626" : "#6B7280";
+  const healthBg    = briefing.overall_health === "HEALTHY" ? "#ECFDF5" : briefing.overall_health === "CAUTION" ? "#FFFBEB" : briefing.overall_health === "CRITICAL" ? "#FEF2F2" : "#F3F4F6";
+
+  const sections: { icon: React.ReactNode; title: string; content?: string; accent: string }[] = [
+    { icon: <TrendingUp size={14} />, title: "Financial Snapshot", content: briefing.financial_snapshot, accent: "#0F3CC9" },
+    { icon: <Map size={14} />,        title: "Route Performance",  content: briefing.route_performance,  accent: "#059669" },
+    { icon: <Map size={14} />,        title: "Network Intelligence", content: briefing.network_intelligence, accent: "#7C3AED" },
+    { icon: <Shield size={14} />,     title: "Risk Flags",           content: briefing.risk_flags,        accent: "#DC2626" },
+    { icon: <Lightbulb size={14} />,  title: "Recommendations",      content: briefing.recommendations,   accent: "#D97706" },
+  ];
+
+  return (
+    <div style={cardStyle}>
+      {/* Header */}
+      <div style={headerStyle}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <FileText size={18} color="#0F3CC9" />
+          <span style={{ fontWeight: 700, fontSize: 15, color: "#1A1A2E" }}>Daily Executive Briefing</span>
+        </div>
+        {briefing.generated_at && (
+          <span style={{ fontSize: 11, color: "#9CA3AF" }}>
+            {new Date(briefing.generated_at).toLocaleString("en-IN", { hour12: true, hour: "numeric", minute: "2-digit", day: "numeric", month: "short" })}
+          </span>
+        )}
+      </div>
+
+      {/* Headline */}
+      {briefing.headline && (
+        <div style={{
+          padding: "16px 24px", margin: "0 20px 16px",
+          background: healthBg, borderRadius: 12,
+          borderLeft: `4px solid ${healthColor}`,
+        }}>
+          <div style={{ fontSize: 10, fontWeight: 600, color: healthColor, letterSpacing: "0.08em", marginBottom: 4 }}>
+            {briefing.overall_health ?? "REPORT"}
+          </div>
+          <p style={{ fontSize: 15, fontWeight: 600, color: "#1A1A2E", lineHeight: 1.5, margin: 0 }}>
+            {briefing.headline}
+          </p>
+        </div>
+      )}
+
+      {/* Sections */}
+      <div style={{ padding: "0 24px 24px", display: "flex", flexDirection: "column", gap: 20 }}>
+        {sections.map((s) =>
+          s.content ? (
+            <div key={s.title}>
+              <div style={{
+                display: "flex", alignItems: "center", gap: 8,
+                marginBottom: 8, color: s.accent,
+              }}>
+                {s.icon}
+                <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase" as const }}>
+                  {s.title}
+                </span>
+              </div>
+              <p style={{
+                fontSize: 13, color: "#374151", lineHeight: 1.75, margin: 0,
+                whiteSpace: "pre-line",
+              }}>
+                {s.content}
+              </p>
+            </div>
+          ) : null
+        )}
+      </div>
+    </div>
+  );
+};
+
+const cardStyle: React.CSSProperties = {
+  background: "#fff",
+  borderRadius: 16,
+  border: "1px solid #EEF0F7",
+  boxShadow: "0 1px 4px rgba(0,0,0,0.04)",
+  overflow: "hidden",
+};
+
+const headerStyle: React.CSSProperties = {
+  padding: "16px 24px",
+  borderBottom: "1px solid #EEF0F7",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "space-between",
+};

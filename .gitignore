@@ -24,14 +24,61 @@ build/
 *.zip
 *.tar.gz
 
+
 # Ignore massive trained models (use Git LFS if you really need to push these)
 *.pkl
 *.joblib
 *.h5
-
+*.docx
 # Keep config files
 !backend/services/*_config.json
 
 # OS generated files
 .DS_Store
 Thumbs.db
+
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Build output
+dist/
+dist-ssr/
+
+# Test coverage
+coverage/
+
+# Environment — NEVER commit secrets
+.env
+.env.local
+.env.*.local
+.venv/
+# Editor
+.vscode/*
+!.vscode/extensions.json
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+
+# Vite
+*.local
+vite.config.ts.timestamp-*
+
+# =========================
+# Debug / Temp Files
+# =========================
+backend/agent_logs/
+backend/mcp_debug.log
+backend/debug_econ.json
+backend/test_econ.txt
+backend/prices.txt
+backend/prices_new.txt
+backend/ccu_maa_fares.json
+backend/check_ccu_maa.py
+backend/check_files.py
+startup_steps.txt
