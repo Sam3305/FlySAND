@@ -53,7 +53,7 @@ coverage/
 .env
 .env.local
 .env.*.local
-.venv/*
+.venv/
 # Editor
 .vscode/*
 !.vscode/extensions.json
@@ -68,3 +68,17 @@ coverage/
 # Vite
 *.local
 vite.config.ts.timestamp-*
+
+# =========================
+# Debug / Temp Files
+# =========================
+backend/agent_logs/
+backend/mcp_debug.log
+backend/debug_econ.json
+backend/test_econ.txt
+backend/prices.txt
+backend/prices_new.txt
+backend/ccu_maa_fares.json
+backend/check_ccu_maa.py
+backend/check_files.py
+startup_steps.txt
