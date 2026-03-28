@@ -181,7 +181,7 @@ graph TB
 ## 4. Project Structure
 
 ```
-AeroSync-India/
+FlySAND/
 ├── backend/
 │   ├── app/
 │   │   ├── core/
