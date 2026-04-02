@@ -230,6 +230,8 @@ def poisson_sleep(days: int) -> float:
     Poisson process) whose mean is the midpoint of sleep_range(days).
     Clipped to the [min, max] bounds so outliers don't stall the swarm.
     """
+     
+
     lo, hi   = sleep_range(days)
     mean     = (lo + hi) / 2.0
     # Exponential distribution: -mean * ln(uniform)

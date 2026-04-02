@@ -69,6 +69,108 @@ class GeminiMasterAgent:
         )
         return f"Successfully committed ₹{new_fare} for {flight_id}."
 
+    async def execute_schedule_reduction(self, route: str, slot_to_cut: str, reason: str) -> str:
+        log.info(f"DB COMMIT: Schedule Reduction {route} (Slot {slot_to_cut}) => {reason}")
+        if "-" not in route:
+            return "Error: Invalid route format. Must be ORIGIN-DEST."
+        origin, dest = route.split("-")
+        
+        cursor = self.db.live_flights.find({
+            "origin": origin,
+            "destination": dest,
+            "slot": slot_to_cut,
+            "status": "scheduled"
+        })
+        flights = await cursor.to_list(length=None)
+        
+        cancelled = 0
+        for fl in flights:
+            capacity = fl.get("inventory", {}).get("capacity", 186)
+            sold = fl.get("inventory", {}).get("sold", 0)
+            lf = (sold / capacity) if capacity else 0
+            
+            # Cancellation Threshold < 10%
+            if lf < 0.10:
+                dep_date = fl.get("departure_date")
+                next_flight = await self.db.live_flights.find_one({
+                    "origin": origin,
+                    "destination": dest,
+                    "status": "scheduled",
+                    "departure_date": {"$gte": dep_date},
+                    "_id": {"$ne": fl["_id"]}
+                }, sort=[("departure_date", 1)])
+                
+                if next_flight:
+                    next_avail = next_flight.get("inventory", {}).get("available", 0)
+                    if next_avail >= sold:
+                        # Passenger Migration
+                        if sold > 0:
+                            await self.db.bookings.update_many(
+                                {"flight_id": str(fl["_id"])},
+                                {"$set": {"flight_id": str(next_flight["_id"])}}
+                            )
+                            await self.db.live_flights.update_one(
+                                {"_id": next_flight["_id"]},
+                                {
+                                    "$inc": {
+                                        "inventory.sold": sold,
+                                        "inventory.available": -sold
+                                    }
+                                }
+                            )
+                        
+                        await self.db.live_flights.update_one(
+                            {"_id": fl["_id"]},
+                            {"$set": {"status": "cancelled", "reason": f"Auto-Op: {reason}"}}
+                        )
+                        cancelled += 1
+                        
+        return f"Evaluated {len(flights)} flights. Cancelled {cancelled} flights under 10% LF and migrated passengers via Protection Protocol."
+
+    async def execute_aircraft_swap(self, route: str, slot: str, new_aircraft: str, new_capacity: int, reason: str) -> str:
+        log.info(f"DB COMMIT: Aircraft Swap {route} (Slot {slot}) to {new_aircraft} => {reason}")
+        if "-" not in route:
+            return "Error: Invalid route format."
+        origin, dest = route.split("-")
+        
+        result = await self.db.live_flights.update_many(
+            {
+                "origin": origin, 
+                "destination": dest, 
+                "slot": slot, 
+                "status": "scheduled",
+                "inventory.sold": {"$lte": new_capacity}
+            },
+            {
+                "$set": {
+                    "inventory.capacity": new_capacity,
+                    "inventory.aircraft": new_aircraft
+                }
+            }
+        )
+        return f"Successfully swapped aircraft to {new_aircraft} for {result.modified_count} eligible flights on {route} (Slot: {slot})."
+
+    async def dispatch_fuel_tankering(self, route: str, extra_fuel_kg: int, reason: str) -> str:
+        log.info(f"DB COMMIT: Fuel Tankering {route} (+{extra_fuel_kg}kg) => {reason}")
+        if "-" not in route:
+            return "Error: Invalid route format."
+        origin, dest = route.split("-")
+        
+        result = await self.db.live_flights.update_many(
+            {
+                "origin": origin, 
+                "destination": dest, 
+                "status": "scheduled"
+            },
+            {
+                "$set": {"dispatch.tankered_fuel_kg": extra_fuel_kg},
+                "$push": {
+                    "dispatch.remarks": f"Auto-Op: Uplift {extra_fuel_kg}kg extra fuel. {reason}"
+                }
+            }
+        )
+        return f"Successfully dispatched tankering orders (+{extra_fuel_kg}kg) to {result.modified_count} flights on {route}."
+
     async def log_agent_discussion(self, log_content: str) -> str:
         filename = self.logs_dir / f"master_log_{datetime.now().strftime('%Y%m%d_%H%M%S')}.md"
         with open(filename, "w", encoding="utf-8") as f:
@@ -107,20 +209,23 @@ class GeminiMasterAgent:
             
             system_prompt = """
             You are the Supreme Master Agent orchestrating an AI-managed airline called AeroSync-India.
-            You have access to specialized Sub-Agents over the Model Context Protocol (MCP).
+            You are operating in FULL EXECUTION MODE. You do not just advise; you manipulate the physical schedules of aircraft.
             
             TOOLS AVAILABLE TO YOU:
-            1. evaluate_route_yields: Queries Yield Manager for pricing. Returns JSON.
-            2. draft_financial_brief: Queries CFO Narrator for finance health. Returns JSON.
-            3. plan_network: Queries Network Planner for scheduling and aircraft right-sizing. Returns JSON.
-            4. optimize_fuel: Queries Fuel Procurement for tankering analysis. Returns JSON.
-            5. commit_pricing_to_db: Commits an approved price to MongoDB.
-            6. log_agent_discussion: Saves a detailed markdown log of your thought process.
+            1. evaluate_route_yields: Queries Yield Manager for pricing logic.
+            2. draft_financial_brief: Queries CFO Narrator for finance health JSON.
+            3. plan_network: Queries Network Planner for scheduling optimizations JSON.
+            4. optimize_fuel: Queries Fuel Procurement for tankering economics JSON.
+            5. commit_pricing_to_db: Authorizes the Yield Manager to mutate live airfares.
+            6. execute_schedule_reduction: Cancels flights to reduce frequency (has built-in >10% pax migration safeguards).
+            7. execute_aircraft_swap: Modifies the live fleet capacity mapping.
+            8. dispatch_fuel_tankering: Uplifts excessive fuel strictly based on Fuel Optimizer limits.
+            9. log_agent_discussion: Saves your final narrative.
             
             YOUR DIRECTIVES:
-            1. Scrutinize all sub-agent JSON arrays carefully.
-            2. Execute commit_pricing_to_db for specific airfares only if they make fiscal sense.
-            3. In your final report, highlight the actions taken by fuel and network planners.
+            1. Parse the JSON insights of the Network Planner first. If it commands cuts or fleet swaps, you MUST execute `execute_schedule_reduction` or `execute_aircraft_swap` appropriately! Do not be timid. Action the cuts!
+            2. Parse the Fuel JSON. Run `dispatch_fuel_tankering` for profitable routes.
+            3. Log your actions transparently using `log_agent_discussion`.
             """
 
             tools = [
@@ -143,6 +248,35 @@ class GeminiMasterAgent:
                         }, required=["flight_id", "new_fare", "reason"])
                     ),
                     types.FunctionDeclaration(
+                        name="execute_schedule_reduction", 
+                        description="Cancels severely underperforming flights and triggers the Passenger Migration system.",
+                        parameters=types.Schema(type=types.Type.OBJECT, properties={
+                            "route": types.Schema(type=types.Type.STRING, description="e.g. BOM-DEL"),
+                            "slot_to_cut": types.Schema(type=types.Type.STRING, description="e.g. C"),
+                            "reason": types.Schema(type=types.Type.STRING)
+                        }, required=["route", "slot_to_cut", "reason"])
+                    ),
+                    types.FunctionDeclaration(
+                        name="execute_aircraft_swap", 
+                        description="Downgrades or upgrades fleet gauge safely.",
+                        parameters=types.Schema(type=types.Type.OBJECT, properties={
+                            "route": types.Schema(type=types.Type.STRING),
+                            "slot": types.Schema(type=types.Type.STRING),
+                            "new_aircraft": types.Schema(type=types.Type.STRING, description="e.g. A320neo"),
+                            "new_capacity": types.Schema(type=types.Type.INTEGER, description="e.g. 186"),
+                            "reason": types.Schema(type=types.Type.STRING)
+                        }, required=["route", "slot", "new_aircraft", "new_capacity", "reason"])
+                    ),
+                    types.FunctionDeclaration(
+                        name="dispatch_fuel_tankering", 
+                        description="Dispatches tankering limits onto actual ops.",
+                        parameters=types.Schema(type=types.Type.OBJECT, properties={
+                            "route": types.Schema(type=types.Type.STRING),
+                            "extra_fuel_kg": types.Schema(type=types.Type.INTEGER),
+                            "reason": types.Schema(type=types.Type.STRING)
+                        }, required=["route", "extra_fuel_kg", "reason"])
+                    ),
+                    types.FunctionDeclaration(
                         name="log_agent_discussion", 
                         description="Saves a master log to the file system.",
                         parameters=types.Schema(type=types.Type.OBJECT, properties={"log_content": types.Schema(type=types.Type.STRING)}, required=["log_content"])
@@ -159,8 +293,8 @@ class GeminiMasterAgent:
                 )
             )
 
-            log.info("Master Agent initiating full system sweep...")
-            prompt = "Act on the current environment. Give me the CFO status, the Network map, the Fuel op, and Yield. Summarize them into a master log."
+            log.info("Master Agent initiating full autonomous execution sweep...")
+            prompt = "Scan the environment. Query Network, Fuel, CFO, and Yield. Automatically execute Schedule Reductions, Fleet Swaps, and Fuel Dispatch based on the precise recommendations from the sub-agents. Then summarize all your actions into the master log."
             
             response = chat.send_message(prompt)
             
@@ -212,6 +346,12 @@ class GeminiMasterAgent:
                             self._update_status("fuel", "last_result", result_str[:300])
                         elif name == "commit_pricing_to_db":
                             result_str = await self.commit_pricing_to_db(args.get("flight_id"), args.get("new_fare"), args.get("reason"))
+                        elif name == "execute_schedule_reduction":
+                            result_str = await self.execute_schedule_reduction(args.get("route"), args.get("slot_to_cut"), args.get("reason"))
+                        elif name == "execute_aircraft_swap":
+                            result_str = await self.execute_aircraft_swap(args.get("route"), args.get("slot"), args.get("new_aircraft"), int(args.get("new_capacity")), args.get("reason"))
+                        elif name == "dispatch_fuel_tankering":
+                            result_str = await self.dispatch_fuel_tankering(args.get("route"), int(args.get("extra_fuel_kg")), args.get("reason"))
                         elif name == "log_agent_discussion":
                             result_str = await self.log_agent_discussion(args.get("log_content"))
                         else:
@@ -233,7 +373,7 @@ class GeminiMasterAgent:
                 if ag in sessions:
                     self._update_status(ag, "status", "idle")
                 
-            log.info("Master Agent Protocol Complete. Final Output:")
+            log.info("Master Agent Execution Protocol Complete. Final Output:")
             log.info(response.text)
 
 
