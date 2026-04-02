@@ -68,6 +68,13 @@ coverage/
 # Vite
 *.local
 vite.config.ts.timestamp-*
+.vite/
+
+# Root Junk
+extract_docx.py
+extracted.txt
+push_error.txt
+script.py
 
 # =========================
 # Debug / Temp Files
